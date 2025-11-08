@@ -50,9 +50,12 @@ export class ElevenLabsConversation {
       // Connect WebSocket
       this.ws = new WebSocket(signedUrl);
       
-      this.ws.onopen = () => {
+      this.ws.onopen = async () => {
         console.log('✅ WebSocket connected');
         this.onStatusCallback?.('connected');
+        
+        // Automatically start listening after connection
+        await this.startListening();
       };
 
       this.ws.onmessage = (event) => {
@@ -79,46 +82,92 @@ export class ElevenLabsConversation {
   /**
    * Handle incoming WebSocket messages
    */
-  private handleWebSocketMessage(event: MessageEvent) {
+  private async handleWebSocketMessage(event: MessageEvent) {
     try {
+      // Handle binary audio data
+      if (event.data instanceof Blob) {
+        console.log('🎵 Received audio blob');
+        const arrayBuffer = await event.data.arrayBuffer();
+        if (this.audioContext && arrayBuffer.byteLength > 0) {
+          try {
+            const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+            this.audioQueue.push(audioBuffer);
+            if (!this.isPlaying) {
+              this.playNextInQueue();
+            }
+            this.onAgentSpeakingCallback?.(true);
+          } catch (e) {
+            console.error('Error decoding audio:', e);
+          }
+        }
+        return;
+      }
+
+      // Handle JSON messages
       const data = JSON.parse(event.data);
       
-      console.log('📨 WebSocket message:', data.type);
+      console.log('📨 WebSocket message:', data.type, data);
 
       switch (data.type) {
         case 'conversation_initiation_metadata':
           console.log('🎤 Agent ready to speak');
+          // Send initial greeting trigger
+          this.sendMessage('Hello, I\'m ready to start the eye examination.');
           break;
 
-        case 'agent_response':
-          // Agent is speaking - play audio and capture transcript
-          if (data.audio) {
-            this.playAgentAudio(data.audio);
+        case 'audio':
+          // Audio chunk from agent
+          if (data.audio_event?.audio_base_64) {
+            await this.playAgentAudioBase64(data.audio_event.audio_base_64);
+            this.onAgentSpeakingCallback?.(true);
           }
-          if (data.transcript) {
-            this.onMessageCallback?.({
-              id: Date.now().toString(),
-              type: 'agent',
-              text: data.transcript,
-              timestamp: Date.now(),
-            });
-          }
-          this.onAgentSpeakingCallback?.(true);
           break;
 
         case 'user_transcript':
+        case 'user_transcription':
           // User speech transcript
-          if (data.transcript) {
+          if (data.user_transcription_event?.user_transcript || data.transcript) {
+            const transcript = data.user_transcription_event?.user_transcript || data.transcript;
+            console.log('👤 User said:', transcript);
             this.onMessageCallback?.({
               id: Date.now().toString(),
               type: 'user',
-              text: data.transcript,
+              text: transcript,
               timestamp: Date.now(),
             });
           }
           break;
 
-        case 'agent_response_complete':
+        case 'agent_response':
+        case 'agent_transcript':
+          // Agent response transcript
+          if (data.agent_response_event?.agent_response || data.transcript) {
+            const transcript = data.agent_response_event?.agent_response || data.transcript;
+            console.log('🤖 Agent said:', transcript);
+            this.onMessageCallback?.({
+              id: Date.now().toString(),
+              type: 'agent',
+              text: transcript,
+              timestamp: Date.now(),
+            });
+          }
+          break;
+
+        case 'agent_response_correction':
+          // Corrected agent transcript
+          if (data.agent_response_correction_event?.corrected_agent_response) {
+            console.log('🤖 Agent said (corrected):', data.agent_response_correction_event.corrected_agent_response);
+            this.onMessageCallback?.({
+              id: Date.now().toString(),
+              type: 'agent',
+              text: data.agent_response_correction_event.corrected_agent_response,
+              timestamp: Date.now(),
+            });
+          }
+          break;
+
+        case 'interruption':
+          console.log('⏸️ Conversation interrupted');
           this.onAgentSpeakingCallback?.(false);
           break;
 
@@ -130,10 +179,10 @@ export class ElevenLabsConversation {
           break;
 
         default:
-          console.log('📨 Unhandled message type:', data.type);
+          console.log('📨 Unhandled message type:', data.type, data);
       }
     } catch (error) {
-      console.error('❌ Error handling WebSocket message:', error);
+      console.error('❌ Error handling WebSocket message:', error, event.data);
     }
   }
 
@@ -142,24 +191,34 @@ export class ElevenLabsConversation {
    */
   async startListening() {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      
-      this.mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'audio/webm',
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          sampleRate: 16000,
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+        }
       });
+      
+      // Use MediaRecorder with supported format
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') 
+        ? 'audio/webm;codecs=opus' 
+        : 'audio/webm';
+        
+      this.mediaRecorder = new MediaRecorder(stream, { mimeType });
 
-      this.mediaRecorder.ondataavailable = (event) => {
+      this.mediaRecorder.ondataavailable = async (event) => {
         if (event.data.size > 0 && this.ws?.readyState === WebSocket.OPEN) {
-          // Convert to base64 and send to agent
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            const base64 = (reader.result as string).split(',')[1];
-            this.ws?.send(JSON.stringify({
-              type: 'user_audio_chunk',
-              audio_chunk: base64,
-            }));
-          };
-          reader.readAsDataURL(event.data);
+          // Send binary audio data directly
+          const arrayBuffer = await event.data.arrayBuffer();
+          const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+          
+          this.ws.send(JSON.stringify({
+            type: 'user_audio_chunk',
+            chunk: {
+              audio_base_64: base64,
+            },
+          }));
         }
       };
 
@@ -183,9 +242,9 @@ export class ElevenLabsConversation {
   }
 
   /**
-   * Play agent audio response
+   * Play agent audio response from base64
    */
-  private async playAgentAudio(base64Audio: string) {
+  private async playAgentAudioBase64(base64Audio: string) {
     try {
       if (!this.audioContext) return;
 
