@@ -1,0 +1,11 @@
+.app-container {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+  pointer-events: none;
+}
+
+.app-container > * {
+  pointer-events: auto;
+}
+
