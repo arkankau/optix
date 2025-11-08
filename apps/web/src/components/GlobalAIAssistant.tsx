@@ -15,7 +15,7 @@ export default function GlobalAIAssistant({ agentId }: GlobalAIAssistantProps) {
   const [isReady, setIsReady] = useState(false);
   const [lastStage, setLastStage] = useState(stage);
   const [messageLog, setMessageLog] = useState<string[]>([]);
-  const [showManualControls, setShowManualControls] = useState(true);
+  const [showManualControls, setShowManualControls] = useState(false); // Hidden by default - xAI controls everything
 
   // Start AI agent when AI is activated (don't wait for widget)
   useEffect(() => {
@@ -28,6 +28,18 @@ export default function GlobalAIAssistant({ agentId }: GlobalAIAssistantProps) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAIActive]); // Only run when AI activation state changes
+
+  // Keyboard shortcut to toggle manual controls (for debugging)
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && e.key === 'M') {
+        setShowManualControls(prev => !prev);
+        console.log('🎮 Manual controls toggled');
+      }
+    };
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, []);
 
   // Monitor stage changes (logging only - no auto-trigger)
   useEffect(() => {

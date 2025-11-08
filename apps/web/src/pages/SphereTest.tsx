@@ -126,6 +126,38 @@ export default function SphereTest() {
         `${emoji} ${result.correct ? 'Correct' : 'Incorrect'} (${confidencePercent}% confidence) - ${result.reasoning}`
       );
 
+      // 🎯 AUTOMATICALLY EXECUTE xAI's RECOMMENDATION
+      console.log(`🤖 xAI recommends: ${result.recommendation}`);
+      
+      switch (result.recommendation) {
+        case 'advance':
+          if (currentLine < 11) {
+            console.log(`⬇️ Advancing to line ${currentLine + 1}`);
+            setCurrentLine(currentLine + 1);
+          } else {
+            console.log('✅ Reached last line, completing test');
+            handleComplete();
+          }
+          break;
+          
+        case 'go_back':
+          if (currentLine > 1) {
+            console.log(`⬆️ Going back to line ${currentLine - 1}`);
+            setCurrentLine(currentLine - 1);
+          }
+          break;
+          
+        case 'complete':
+          console.log('✅ xAI says test is complete, finishing this eye');
+          handleComplete();
+          break;
+          
+        case 'stay':
+        default:
+          console.log('⏸️ Staying on current line');
+          break;
+      }
+
     } catch (error) {
       console.error('❌ Analysis error:', error);
     } finally {
