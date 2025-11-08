@@ -47,6 +47,8 @@ export default function JCCTest() {
 
   const initJCC = async () => {
     try {
+      console.log(`🔄 Initializing JCC for ${currentEye}...`);
+      
       const response = await api.initJCC(currentEye);
       setJccStateLocal(response.state);
       setJccState(currentEye, response.state);
@@ -57,9 +59,9 @@ export default function JCCTest() {
       const eyeName = currentEye === 'OD' ? 'right' : 'left';
       setPrompt(`Now testing astigmatism for your ${eyeName} eye. Which is clearer: one... or two?`);
       
-      console.log(`👁️  Started JCC for ${currentEye}`);
+      console.log(`👁️ Started JCC for ${currentEye}`);
     } catch (error) {
-      console.error('Failed to init JCC:', error);
+      console.error('❌ Failed to init JCC:', error);
     }
   };
 
@@ -94,13 +96,18 @@ export default function JCCTest() {
       // Removed Grok hints - not needed for JCC test
 
       if (response.complete) {
-        console.log(`✅ JCC complete for ${currentEye}: cyl=${response.result.cyl}D @ ${response.result.axis}°`);
-        
-        setJccResult(currentEye, {
+        const jccResultData = {
           cyl: response.result.cyl,
           axis: response.result.axis,
           confidence: response.confidence,
-        });
+        };
+        
+        console.log(`✅ JCC complete for ${currentEye}:`, jccResultData);
+        
+        setJccResult(currentEye, jccResultData);
+        
+        // Log to confirm it was saved
+        console.log(`💾 Saved JCC result for ${currentEye} to global store`);
 
         setIsComplete(true);
 

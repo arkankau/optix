@@ -282,7 +282,10 @@ export default function SphereTest() {
         setWidgetReady(false); // Reset widget
       }, 2000);
     } else {
+      // OS sphere complete - now do JCC starting with OD
       setTimeout(() => {
+        setCurrentEye('OD'); // Reset to OD for JCC test
+        setStage('jcc_od');
         navigate('/jcc');
       }, 2000);
     }
