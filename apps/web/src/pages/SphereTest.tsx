@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTestStore } from '../store/testStore';
 import { useAI } from '../contexts/AIContext';
@@ -7,6 +7,7 @@ import AlertBanner from '../components/AlertBanner';
 import VoiceButton from '../components/VoiceButton';
 import { api } from '../api/client';
 import { formatDiopter } from '../services/xaiAnalyzer';
+import { sendSystemMessageToAgent, SphereTestMessages } from '../utils/elevenLabsMessenger';
 
 function getLineLabel(line: number): string {
   const labels: Record<number, string> = {
@@ -43,6 +44,7 @@ export default function SphereTest() {
     patientTranscriptions,
     currentAnalysis,
     xaiAnalyses,
+    elevenLabsReady,
     addPatientTranscription,
     addXAIAnalysis,
   } = useTestStore();
@@ -53,6 +55,7 @@ export default function SphereTest() {
   const [widgetReady, setWidgetReady] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [lastAnalyzedTranscript, setLastAnalyzedTranscript] = useState('');
+  const lastProcessedTranscription = useRef<number>(0); // Timestamp of last processed transcription
 
   useEffect(() => {
     if (!sessionId || !calibration) {
@@ -72,19 +75,26 @@ export default function SphereTest() {
     }
   }, [sessionId, calibration, currentEye, widgetReady, stage, setStage]);
 
-  // Watch for new patient transcriptions and analyze them
+  // Watch for new patient transcriptions (from ElevenLabs or VoiceButton) and analyze them
   useEffect(() => {
     const latestTranscription = patientTranscriptions[patientTranscriptions.length - 1];
     
+    // Check if this is a new transcription for the current sphere test
     if (latestTranscription && 
-        latestTranscription.text !== lastAnalyzedTranscript &&
+        latestTranscription.timestamp > lastProcessedTranscription.current &&
         latestTranscription.eye === currentEye &&
-        !analyzing) {
+        (latestTranscription.stage === `sphere_${currentEye.toLowerCase()}` || latestTranscription.stage === stage) &&
+        !analyzing &&
+        !isComplete) {
       
-      console.log('🧠 New patient speech detected, analyzing with xAI...');
-      analyzePatientResponse(latestTranscription.text);
+      console.log('🧠 New patient speech detected from', elevenLabsReady ? 'ElevenLabs' : 'VoiceButton', '- analyzing with xAI...');
+      lastProcessedTranscription.current = latestTranscription.timestamp;
+      
+      // Normalize and analyze
+      const normalizedText = normalizeLetterTranscript(latestTranscription.text);
+      analyzePatientResponse(normalizedText);
     }
-  }, [patientTranscriptions, currentEye]);
+  }, [patientTranscriptions, currentEye, stage, analyzing, isComplete, elevenLabsReady]);
 
   // Handle voice transcription from VoiceButton
   const handleVoiceTranscript = (text: string, confidence: number) => {
@@ -179,6 +189,16 @@ export default function SphereTest() {
         `${emoji} ${result.correct ? 'Correct' : 'Incorrect'} (${confidencePercent}% confidence) - ${result.reasoning}`
       );
 
+      // 📤 Send feedback to ElevenLabs agent if widget is active
+      if (elevenLabsReady) {
+        if (result.correct && currentLine < 11) {
+          const nextLetters = getExpectedLettersForLine(currentLine + 1);
+          sendSystemMessageToAgent(SphereTestMessages.correctAnswer(currentLine, nextLetters));
+        } else if (!result.correct) {
+          sendSystemMessageToAgent(SphereTestMessages.incorrectAnswer(currentLine, expectedLetters, patientSpeech));
+        }
+      }
+
       // 🎯 AUTOMATICALLY EXECUTE xAI's RECOMMENDATION
       console.log(`🤖 xAI recommends: ${result.recommendation}`);
       
@@ -238,7 +258,15 @@ export default function SphereTest() {
     const eyeName = currentEye === 'OD' ? 'right' : 'left';
     setCurrentLine(1); // Start from line 1 (20/200)
     setPrompt(`Testing your ${eyeName} eye. The AI will guide you through the chart.`);
-    console.log(`👁️  Started sphere test for ${currentEye} with fixed chart`);
+    console.log(`👁️ Started sphere test for ${currentEye} with fixed chart`);
+    
+    // 📤 Notify ElevenLabs agent to start this eye test
+    if (elevenLabsReady) {
+      const message = currentEye === 'OD' 
+        ? SphereTestMessages.startRightEye() 
+        : SphereTestMessages.startLeftEye();
+      sendSystemMessageToAgent(message);
+    }
   };
 
   const handleWidgetMessage = (message: string, isUser: boolean) => {
@@ -272,6 +300,11 @@ export default function SphereTest() {
 
     console.log(`✅ Sphere test complete for ${currentEye}:`, result);
     console.log(`   Best Line: ${bestLine}, Current Line: ${currentLine}, Sphere: ${sphereValue}D`);
+
+    // 📤 Notify ElevenLabs agent about completion
+    if (elevenLabsReady) {
+      sendSystemMessageToAgent(SphereTestMessages.testComplete(currentEye, bestLine));
+    }
 
     // Move to next eye or astigmatism test
     if (currentEye === 'OD') {
@@ -341,28 +374,57 @@ export default function SphereTest() {
       <div className="text-center" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', alignItems: 'center' }}>
         <div style={{
           padding: '1.5rem',
-          background: 'rgba(59, 130, 246, 0.1)',
-          border: '1px solid rgba(59, 130, 246, 0.3)',
+          background: elevenLabsReady ? 'rgba(16, 185, 129, 0.1)' : 'rgba(59, 130, 246, 0.1)',
+          border: `1px solid ${elevenLabsReady ? 'rgba(16, 185, 129, 0.3)' : 'rgba(59, 130, 246, 0.3)'}`,
           borderRadius: '0.5rem',
           maxWidth: '600px',
         }}>
           <p style={{ fontSize: '1rem', color: 'var(--color-text)', marginBottom: '0.5rem' }}>
-            <strong>🎤 Voice Testing</strong>
+            <strong>{elevenLabsReady ? '🤖 AI Conversation Mode' : '🎤 Voice Testing'}</strong>
           </p>
           <p style={{ fontSize: '0.875rem', color: 'var(--color-text-dim)' }}>
-            Click the button and read the letters you can see on line {currentLine}.
-            {' '}Speak clearly and the browser will transcribe automatically.
+            {elevenLabsReady 
+              ? 'The AI assistant will guide you through the test. Simply speak naturally and follow the instructions.'
+              : 'Click the button below and read the letters you can see on line ' + currentLine + '. Speak clearly and the browser will transcribe automatically.'
+            }
           </p>
           <p style={{ fontSize: '0.875rem', color: 'var(--color-text-dim)', marginTop: '0.5rem' }}>
             Current line: <strong>{currentLine}</strong> ({getLineLabel(currentLine)})
           </p>
         </div>
 
-        {/* Voice Button */}
-        <VoiceButton 
-          onTranscript={handleVoiceTranscript}
-          disabled={analyzing || isComplete}
-        />
+        {/* Voice Button - Only show if ElevenLabs is not ready (fallback mode) */}
+        {!elevenLabsReady && (
+          <VoiceButton 
+            onTranscript={handleVoiceTranscript}
+            disabled={analyzing || isComplete}
+          />
+        )}
+
+        {/* ElevenLabs Active Indicator */}
+        {elevenLabsReady && (
+          <div style={{
+            padding: '1rem 1.5rem',
+            background: 'rgba(16, 185, 129, 0.2)',
+            border: '1px solid rgba(16, 185, 129, 0.4)',
+            borderRadius: '0.5rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem',
+          }}>
+            <div style={{
+              width: '10px',
+              height: '10px',
+              borderRadius: '50%',
+              background: 'rgba(16, 185, 129, 1)',
+              boxShadow: '0 0 10px rgba(16, 185, 129, 0.5)',
+              animation: 'pulse 2s infinite',
+            }} />
+            <span style={{ fontSize: '0.875rem', color: 'var(--color-text)' }}>
+              AI Assistant is active - see widget in bottom right corner
+            </span>
+          </div>
+        )}
 
         {/* Patient Transcription Display */}
         <div style={{

@@ -2,17 +2,19 @@ import { useEffect, useState } from 'react';
 import { useAI } from '../contexts/AIContext';
 import { useTestStore } from '../store/testStore';
 import { useAIAgent } from '../hooks/useAIAgent';
+import ElevenLabsWidget from './ElevenLabsWidget';
 
 interface GlobalAIAssistantProps {
-  agentId?: string; // Now optional since we're not using the widget
+  agentId: string;
 }
 
 export default function GlobalAIAssistant({ agentId }: GlobalAIAssistantProps) {
   const { isAIActive } = useAI();
-  const { stage, currentEye } = useTestStore();
+  const { stage, currentEye, setElevenLabsReady, addPatientTranscription } = useTestStore();
   const { startAgent, agentThinking, executeManualAction, lastMessage } = useAIAgent();
   const [lastStage, setLastStage] = useState(stage);
   const [showManualControls, setShowManualControls] = useState(false); // Hidden by default - xAI controls everything
+  const [widgetReady, setWidgetReady] = useState(false);
 
   // Start AI agent when AI is activated (don't wait for widget)
   useEffect(() => {
@@ -38,22 +40,57 @@ export default function GlobalAIAssistant({ agentId }: GlobalAIAssistantProps) {
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, []);
 
-  // Monitor stage changes (logging only - no auto-trigger)
+  // Monitor stage changes
   useEffect(() => {
     if (lastStage !== stage && isAIActive) {
       console.log(`📊 Stage changed: ${lastStage} → ${stage}`);
       setLastStage(stage);
-      
-      // NOTE: Auto-trigger disabled - progression now happens ONLY through voice interactions
-      // The AI examiner in ElevenLabs will guide the patient and trigger stage changes
-      // via voice commands that get processed through handleMessage
     }
   }, [stage, lastStage, isAIActive]);
 
-  // No widget - voice input now handled by VoiceButton on each page
+  // Handle ElevenLabs widget ready
+  const handleWidgetReady = () => {
+    console.log('✅ ElevenLabs widget is ready');
+    setWidgetReady(true);
+    setElevenLabsReady(true);
+  };
+
+  // Handle messages from ElevenLabs widget
+  const handleWidgetMessage = (message: string, isUser: boolean) => {
+    console.log(`🎤 ElevenLabs ${isUser ? 'User' : 'AI'}: ${message}`);
+    
+    // Only process user messages (patient speech)
+    // AI messages are just the agent speaking back
+    if (isUser) {
+      // Store patient transcription for the current stage
+      // The specific test pages (SphereTest, JCCTest) will handle the analysis
+      addPatientTranscription({
+        timestamp: Date.now(),
+        text: message,
+        eye: currentEye,
+        line: 0, // Will be set by the test page
+        stage: stage,
+      });
+    }
+  };
 
   return (
     <>
+      {/* ElevenLabs Conversational Widget - Global Floating */}
+      {isAIActive && (
+        <div style={{
+          position: 'fixed',
+          bottom: '20px',
+          right: '20px',
+          zIndex: 9999,
+        }}>
+          <ElevenLabsWidget
+            agentId={agentId}
+            onMessage={handleWidgetMessage}
+            onReady={handleWidgetReady}
+          />
+        </div>
+      )}
 
       {/* Agent thinking indicator */}
       {agentThinking && (

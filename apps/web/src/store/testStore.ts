@@ -64,6 +64,7 @@ interface TestState {
   // UI state
   showGrokHint: boolean;
   grokMessage: string;
+  elevenLabsReady: boolean;
 
   // Actions
   setSessionId: (id: string) => void;
@@ -81,6 +82,7 @@ interface TestState {
   setCurrentAnalysis: (analysis: XAIAnalysis | null) => void;
   showGrok: (message: string) => void;
   hideGrok: () => void;
+  setElevenLabsReady: (ready: boolean) => void;
   reset: () => void;
 }
 
@@ -101,6 +103,7 @@ const initialState = {
   currentAnalysis: null as XAIAnalysis | null,
   showGrokHint: false,
   grokMessage: '',
+  elevenLabsReady: false,
 };
 
 export const useTestStore = create<TestState>((set) => ({
@@ -154,6 +157,8 @@ export const useTestStore = create<TestState>((set) => ({
 
   showGrok: (message) => set({ showGrokHint: true, grokMessage: message }),
   hideGrok: () => set({ showGrokHint: false, grokMessage: '' }),
+
+  setElevenLabsReady: (ready) => set({ elevenLabsReady: ready }),
 
   reset: () => set(initialState),
 }));

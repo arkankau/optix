@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTestStore } from '../store/testStore';
 import { api } from '../api/client';
 import VoiceButton from '../components/VoiceButton';
 import TTSPlayer from '../components/TTSPlayer';
 import AlertBanner from '../components/AlertBanner';
+import { sendSystemMessageToAgent, JCCTestMessages } from '../utils/elevenLabsMessenger';
 
 export default function JCCTest() {
   const navigate = useNavigate();
@@ -21,6 +22,8 @@ export default function JCCTest() {
     grokMessage,
     hideGrok,
     showGrok,
+    elevenLabsReady,
+    patientTranscriptions,
   } = useTestStore();
 
   const [jccState, setJccStateLocal] = useState<any>(null);
@@ -28,6 +31,7 @@ export default function JCCTest() {
   const [prompt, setPrompt] = useState('');
   const [trialStartTime, setTrialStartTime] = useState(0);
   const [isComplete, setIsComplete] = useState(false);
+  const lastProcessedTranscription = useRef<number>(0);
 
   useEffect(() => {
     if (!sessionId || !calibration) {
@@ -45,6 +49,25 @@ export default function JCCTest() {
     initJCC();
   }, [sessionId, calibration, currentEye, stage, setStage]);
 
+  // Watch for patient choices from ElevenLabs widget
+  useEffect(() => {
+    const latestTranscription = patientTranscriptions[patientTranscriptions.length - 1];
+    
+    // Only process transcriptions for current JCC test
+    if (latestTranscription && 
+        latestTranscription.timestamp > lastProcessedTranscription.current &&
+        (latestTranscription.stage === `jcc_${currentEye.toLowerCase()}` || latestTranscription.stage === stage) &&
+        !isComplete &&
+        jccState) {
+      
+      console.log('🎤 ElevenLabs choice detected:', latestTranscription.text);
+      lastProcessedTranscription.current = latestTranscription.timestamp;
+      
+      // Process as if it came from handleTranscript
+      handleTranscript(latestTranscription.text, 1.0);
+    }
+  }, [patientTranscriptions, currentEye, stage, isComplete, jccState]);
+
   const initJCC = async () => {
     try {
       console.log(`🔄 Initializing JCC for ${currentEye}...`);
@@ -60,6 +83,11 @@ export default function JCCTest() {
       setPrompt(`Now testing astigmatism for your ${eyeName} eye. Which is clearer: one... or two?`);
       
       console.log(`👁️ Started JCC for ${currentEye}`);
+      
+      // 📤 Notify ElevenLabs agent
+      if (elevenLabsReady) {
+        sendSystemMessageToAgent(JCCTestMessages.start(currentEye));
+      }
     } catch (error) {
       console.error('❌ Failed to init JCC:', error);
     }
@@ -87,6 +115,11 @@ export default function JCCTest() {
 
     console.log(`📝 JCC choice: ${choice}`);
 
+    // 📤 Acknowledge choice to ElevenLabs
+    if (elevenLabsReady) {
+      sendSystemMessageToAgent(JCCTestMessages.choiceReceived(choice));
+    }
+
     try {
       const response = await api.nextJCC(jccState, choice, latencyMs);
       
@@ -108,6 +141,11 @@ export default function JCCTest() {
         
         // Log to confirm it was saved
         console.log(`💾 Saved JCC result for ${currentEye} to global store`);
+
+        // 📤 Notify ElevenLabs agent of completion
+        if (elevenLabsReady) {
+          sendSystemMessageToAgent(JCCTestMessages.testComplete(currentEye, jccResultData.cyl, jccResultData.axis));
+        }
 
         setIsComplete(true);
 
@@ -131,6 +169,11 @@ export default function JCCTest() {
         // Next comparison
         setTrialStartTime(Date.now());
         setPrompt('Which is clearer: one... or two?');
+        
+        // 📤 Notify ElevenLabs agent about next comparison
+        if (elevenLabsReady) {
+          sendSystemMessageToAgent(JCCTestMessages.nextComparison());
+        }
         
         // Alternate display (simulate flip)
         setShowingChoice(showingChoice === 1 ? 2 : 1);
@@ -178,6 +221,32 @@ export default function JCCTest() {
 
       <div className="text-center" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center' }}>
         <TTSPlayer text={prompt} autoPlay={false} />
+        
+        {/* ElevenLabs Active Indicator */}
+        {elevenLabsReady && (
+          <div style={{
+            padding: '1rem 1.5rem',
+            background: 'rgba(16, 185, 129, 0.2)',
+            border: '1px solid rgba(16, 185, 129, 0.4)',
+            borderRadius: '0.5rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem',
+            maxWidth: '500px',
+          }}>
+            <div style={{
+              width: '10px',
+              height: '10px',
+              borderRadius: '50%',
+              background: 'rgba(16, 185, 129, 1)',
+              boxShadow: '0 0 10px rgba(16, 185, 129, 0.5)',
+              animation: 'pulse 2s infinite',
+            }} />
+            <span style={{ fontSize: '0.875rem', color: 'var(--color-text)' }}>
+              🤖 AI Assistant is guiding you - speak naturally to answer
+            </span>
+          </div>
+        )}
         
         <div style={{ display: 'flex', gap: '1rem' }}>
           <button
