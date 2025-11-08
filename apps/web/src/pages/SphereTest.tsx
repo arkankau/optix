@@ -30,6 +30,7 @@ export default function SphereTest() {
     sessionId,
     calibration,
     currentEye,
+    stage,
     setStage,
     setSphereState,
     setSphereResult,
