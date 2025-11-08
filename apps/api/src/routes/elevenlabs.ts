@@ -6,12 +6,25 @@ const router = Router();
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
 
 if (!ELEVENLABS_API_KEY) {
-  console.warn('⚠️ ELEVENLABS_API_KEY not configured');
+  console.warn('⚠️ ELEVENLABS_API_KEY not configured - ElevenLabs features will be disabled');
 }
 
-const elevenlabs = new ElevenLabsClient({
-  apiKey: ELEVENLABS_API_KEY,
-});
+// Lazy initialization - only create client when needed
+let elevenLabsClient: ElevenLabsClient | null = null;
+
+function getElevenLabsClient(): ElevenLabsClient {
+  if (!ELEVENLABS_API_KEY) {
+    throw new Error('ElevenLabs API key not configured');
+  }
+  
+  if (!elevenLabsClient) {
+    elevenLabsClient = new ElevenLabsClient({
+      apiKey: ELEVENLABS_API_KEY,
+    });
+  }
+  
+  return elevenLabsClient;
+}
 
 // Store agent ID (in production, use database)
 let cachedAgentId: string | null = null;
@@ -37,7 +50,8 @@ router.get('/agent', async (req, res) => {
     // Create new agent
     console.log('🔄 Creating new ElevenLabs agent...');
     
-    const agent = await elevenlabs.conversationalAi.agents.create({
+    const client = getElevenLabsClient();
+    const agent = await client.conversationalAi.agents.create({
       name: 'Optix Eye Test Assistant',
       conversationConfig: {
         agent: {
@@ -105,7 +119,8 @@ router.post('/signed-url', async (req, res) => {
     console.log('🔐 Generating signed URL for agent:', agentId);
 
     // Get signed URL for WebSocket connection
-    const signedUrl = await elevenlabs.conversationalAi.getSignedUrl({
+    const client = getElevenLabsClient();
+    const signedUrl = await client.conversationalAi.getSignedUrl({
       agentId,
     });
 
