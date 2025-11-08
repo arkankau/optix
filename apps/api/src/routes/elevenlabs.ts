@@ -3,14 +3,8 @@ import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js';
 
 const router = Router();
 
+// Get API key - will be available after dotenv.config() in index.ts
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
-
-console.log('🔍 Debug: ELEVENLABS_API_KEY =', ELEVENLABS_API_KEY ? `${ELEVENLABS_API_KEY.substring(0, 10)}...` : 'undefined');
-console.log('🔍 Debug: All env keys:', Object.keys(process.env).filter(k => k.includes('ELEVEN')));
-
-if (!ELEVENLABS_API_KEY) {
-  console.warn('⚠️ ELEVENLABS_API_KEY not configured - ElevenLabs features will be disabled');
-}
 
 // Lazy initialization - only create client when needed
 let elevenLabsClient: ElevenLabsClient | null = null;

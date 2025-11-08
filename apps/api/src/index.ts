@@ -95,10 +95,10 @@ app.listen(PORT, () => {
   console.log(`📡 Listening on http://localhost:${PORT}`);
   console.log(`🌐 CORS enabled for ${FRONTEND_ORIGIN}`);
   console.log("\n🎤 Voice Integrations:");
-  console.log(`   - ElevenLabs TTS: ${process.env.ELEVENLABS_API_KEY ? "✅" : "⚠️  Not configured"}`);
-  console.log(`   - Gemini STT/NLU: ${process.env.GEMINI_API_KEY ? "✅" : "⚠️  Not configured"}`);
-  console.log(`   - xAI Grok: ${process.env.XAI_GROK_API_KEY ? "✅" : "⚠️  Not configured"}`);
-  console.log("\n");
+  console.log(`   - ElevenLabs TTS: ${process.env.ELEVENLABS_API_KEY ? "✅ Configured" : "⚠️  Not configured"}`);
+  console.log(`   - Gemini STT/NLU: ${process.env.GEMINI_API_KEY ? "✅ Configured" : "⚠️  Not configured"}`);
+  console.log(`   - xAI Grok: ${process.env.XAI_GROK_API_KEY ? "✅ Configured" : "⚠️  Not configured"}`);
+  console.log("\n✨ All systems ready! Open http://localhost:5173 to start testing\n");
 });
 
 export default app;
