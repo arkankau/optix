@@ -9,8 +9,8 @@ import {
   isJccComplete,
   getJccResult,
   calculateJccConfidence,
-} from "@nearify/core";
-import { grokHint } from "@nearify/agent";
+} from "@OptiX/core";
+import { grokHint } from "@OptiX/agent";
 
 const router = Router();
 

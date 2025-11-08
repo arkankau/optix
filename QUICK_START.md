@@ -2,7 +2,7 @@
 
 ## What's Different Now?
 
-Your Nearify Exam is now **100% AI-driven**. The ElevenLabs Conversational AI guides patients through the ENTIRE examination from start to finish.
+Your OptiX Exam is now **100% AI-driven**. The ElevenLabs Conversational AI guides patients through the ENTIRE examination from start to finish.
 
 ---
 

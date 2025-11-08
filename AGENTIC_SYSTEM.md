@@ -2,7 +2,7 @@
 
 ## Overview
 
-Your Nearify Exam now features **true agentic AI** - the AI doesn't just guide, it **directly controls** the examination flow using function calling via xAI Grok.
+Your OptiX Exam now features **true agentic AI** - the AI doesn't just guide, it **directly controls** the examination flow using function calling via xAI Grok.
 
 ---
 

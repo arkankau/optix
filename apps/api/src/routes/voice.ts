@@ -4,8 +4,8 @@
 
 import { Router } from "express";
 import multer from "multer";
-import { ttsSpeak } from "@nearify/voice";
-import { sttGemini, detectIntent } from "@nearify/voice";
+import { ttsSpeak } from "@OptiX/voice";
+import { sttGemini, detectIntent } from "@OptiX/voice";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });

@@ -1,5 +1,5 @@
 /**
- * Nearify Exam API Server
+ * OptiX Exam API Server
  * 
  * CRITICAL: Load environment variables FIRST before any imports!
  */
@@ -91,7 +91,7 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 
 // Start server (database already initialized)
 app.listen(PORT, () => {
-  console.log("\n🚀 Nearify Exam API Server");
+  console.log("\n🚀 OptiX Exam API Server");
   console.log(`📡 Listening on http://localhost:${PORT}`);
   console.log(`🌐 CORS enabled for ${FRONTEND_ORIGIN}`);
   console.log("\n🎤 Voice Integrations:");

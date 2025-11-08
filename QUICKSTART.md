@@ -1,6 +1,6 @@
 # ⚡ Quick Start Guide
 
-Get Nearify Exam running in 3 minutes!
+Get OptiX Exam running in 3 minutes!
 
 ## Step 1: Install Dependencies
 
@@ -25,7 +25,7 @@ PHOTON_API_KEY=
 DEDALUS_API_KEY=
 FRONTEND_ORIGIN=http://localhost:5173
 PORT=8787
-DATABASE_URL=file:./nearify.sqlite" > .env
+DATABASE_URL=file:./OptiX.sqlite" > .env
 ```
 
 > **Note**: The app works with mock responses if you don't have API keys!
@@ -39,7 +39,7 @@ pnpm dev
 
 You'll see:
 ```
-🚀 Nearify Exam API Server
+🚀 OptiX Exam API Server
 📡 Listening on http://localhost:8787
 
 🎤 Voice Integrations:
@@ -142,7 +142,7 @@ pnpm build
 
 ### Database locked
 ```bash
-rm nearify.sqlite nearify.sqlite-journal
+rm OptiX.sqlite OptiX.sqlite-journal
 ```
 
 ---
@@ -158,7 +158,7 @@ eye-test/
 │   ├── core/         ← Algorithms (staircase, JCC)
 │   ├── agent/        ← AI routing (Grok, Photon, Dedalus)
 │   └── voice/        ← Voice clients (ElevenLabs, Gemini)
-├── nearify.sqlite    ← Auto-created database
+├── OptiX.sqlite    ← Auto-created database
 ├── package.json      ← Root workspace
 └── pnpm-workspace.yaml
 ```

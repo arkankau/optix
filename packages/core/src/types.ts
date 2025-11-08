@@ -1,5 +1,5 @@
 /**
- * Core types for Nearify Exam
+ * Core types for OptiX Exam
  */
 
 export type Eye = "OD" | "OS";

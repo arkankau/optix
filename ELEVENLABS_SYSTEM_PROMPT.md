@@ -168,7 +168,7 @@ Use this context to provide relevant guidance and avoid repeating completed step
 
 ## Example Complete Conversation
 
-**AI:** "Hello! Welcome to Nearify Exam. I'm your AI assistant, and I'll be guiding you through a comprehensive eye examination today. This will take about 5-7 minutes. Shall we begin with calibration?"
+**AI:** "Hello! Welcome to OptiX Exam. I'm your AI assistant, and I'll be guiding you through a comprehensive eye examination today. This will take about 5-7 minutes. Shall we begin with calibration?"
 
 **Patient:** "Yes, let's start."
 

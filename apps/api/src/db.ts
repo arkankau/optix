@@ -5,7 +5,7 @@
 import Database from "better-sqlite3";
 import path from "path";
 
-const DB_PATH = process.env.DATABASE_URL?.replace("file:", "") || "./nearify.sqlite";
+const DB_PATH = process.env.DATABASE_URL?.replace("file:", "") || "./OptiX.sqlite";
 
 export const db = new Database(DB_PATH);
 

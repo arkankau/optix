@@ -77,7 +77,7 @@ export default function Summary() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `nearify-${sessionId}.csv`;
+      a.download = `OptiX-${sessionId}.csv`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (error) {

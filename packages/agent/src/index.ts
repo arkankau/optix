@@ -1,5 +1,5 @@
 /**
- * @nearify/agent - Agent routing and orchestration
+ * @OptiX/agent - Agent routing and orchestration
  */
 
 export * from "./grok";

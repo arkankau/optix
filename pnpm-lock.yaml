@@ -27,13 +27,13 @@ importers:
       '@elevenlabs/elevenlabs-js':
         specifier: ^2.22.0
         version: 2.22.0
-      '@nearify/agent':
+      '@OptiX/agent':
         specifier: workspace:*
         version: link:../../packages/agent
-      '@nearify/core':
+      '@OptiX/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@nearify/voice':
+      '@OptiX/voice':
         specifier: workspace:*
         version: link:../../packages/voice
       axios:

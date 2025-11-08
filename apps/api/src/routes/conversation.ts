@@ -9,7 +9,7 @@ import {
   sendAudioToConversation,
   sendTextToConversation,
   endConversation,
-} from "@nearify/voice";
+} from "@OptiX/voice";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });

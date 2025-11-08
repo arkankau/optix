@@ -1,4 +1,4 @@
-# Nearify Exam — Demo Script
+# OptiX Exam — Demo Script
 
 ## 🎯 Prize Integration Callouts
 
@@ -156,7 +156,7 @@ Watch the browser console during the test:
 
 ## 🗄️ SQLite Database
 
-Location: `./nearify.sqlite`
+Location: `./OptiX.sqlite`
 
 Tables:
 - **sessions**: Test sessions
@@ -165,7 +165,7 @@ Tables:
 
 Query example:
 ```bash
-sqlite3 nearify.sqlite "SELECT * FROM rx;"
+sqlite3 OptiX.sqlite "SELECT * FROM rx;"
 ```
 
 ---

@@ -44,7 +44,7 @@ export default function Home() {
     }}>
       <div style={{ marginBottom: '3rem' }}>
         <h1 style={{ fontSize: '3rem', fontWeight: 700, marginBottom: '1rem' }}>
-          👁️ Nearify Exam
+          👁️ OptiX Exam
         </h1>
         <p style={{ fontSize: '1.5rem', color: 'var(--color-text-dim)' }}>
           Voice-First Subjective Refraction

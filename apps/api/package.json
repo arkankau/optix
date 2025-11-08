@@ -1,5 +1,5 @@
 {
-  "name": "@nearify/api",
+  "name": "@OptiX/api",
   "version": "1.0.0",
   "main": "./dist/index.js",
   "scripts": {
@@ -10,9 +10,9 @@
   },
   "dependencies": {
     "@elevenlabs/elevenlabs-js": "^2.22.0",
-    "@nearify/agent": "workspace:*",
-    "@nearify/core": "workspace:*",
-    "@nearify/voice": "workspace:*",
+    "@OptiX/agent": "workspace:*",
+    "@OptiX/core": "workspace:*",
+    "@OptiX/voice": "workspace:*",
     "axios": "^1.13.2",
     "better-sqlite3": "^9.2.2",
     "cors": "^2.8.5",

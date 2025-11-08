@@ -122,7 +122,7 @@ router.get("/:sessionId/export", (req, res) => {
     }
 
     res.set("Content-Type", "text/csv");
-    res.set("Content-Disposition", `attachment; filename="nearify-${sessionId}.csv"`);
+    res.set("Content-Disposition", `attachment; filename="OptiX-${sessionId}.csv"`);
     res.send(csv);
   } catch (error: any) {
     console.error("Export error:", error);

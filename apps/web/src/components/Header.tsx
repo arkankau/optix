@@ -11,7 +11,7 @@ export default function Header() {
       case 'jcc_od': return 'Astigmatism - Right Eye';
       case 'jcc_os': return 'Astigmatism - Left Eye';
       case 'complete': return 'Complete';
-      default: return 'Nearify Exam';
+      default: return 'OptiX Exam';
     }
   };
 
@@ -30,7 +30,7 @@ export default function Header() {
       }}>
         <div>
           <h1 style={{ fontSize: '1.5rem', fontWeight: 600 }}>
-            Nearify Exam
+            OptiX Exam
           </h1>
           <p style={{ fontSize: '0.875rem', color: 'var(--color-text-dim)', marginTop: '0.25rem' }}>
             {getStageLabel()}

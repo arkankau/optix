@@ -1,5 +1,5 @@
 /**
- * @nearify/voice - Voice clients (ElevenLabs TTS + Conversational AI + Gemini STT/NLU)
+ * @OptiX/voice - Voice clients (ElevenLabs TTS + Conversational AI + Gemini STT/NLU)
  */
 
 export * from "./elevenlabs";

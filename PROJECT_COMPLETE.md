@@ -1,4 +1,4 @@
-# ✅ Nearify Exam — Project Complete
+# ✅ OptiX Exam — Project Complete
 
 ## 🎉 What Was Built
 

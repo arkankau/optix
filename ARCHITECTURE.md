@@ -2,7 +2,7 @@
 
 ## System Overview
 
-Nearify Exam is a voice-first subjective refraction exam built as a TypeScript monorepo with clear separation of concerns.
+OptiX Exam is a voice-first subjective refraction exam built as a TypeScript monorepo with clear separation of concerns.
 
 ```
 ┌─────────────────────────────────────────────────────┐
@@ -39,7 +39,7 @@ Nearify Exam is a voice-first subjective refraction exam built as a TypeScript m
 ### Monorepo Structure
 
 ```
-nearify-exam/
+OptiX-exam/
 ├── apps/
 │   ├── api/              # Backend Express server
 │   │   ├── src/
@@ -611,7 +611,7 @@ CREATE TABLE rx (
 pnpm dev
 → API: localhost:8787
 → Web: localhost:5173
-→ DB: ./nearify.sqlite
+→ DB: ./OptiX.sqlite
 ```
 
 ### Production (Vercel)

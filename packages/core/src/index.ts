@@ -1,5 +1,5 @@
 /**
- * @nearify/core - Core algorithms and types
+ * @OptiX/core - Core algorithms and types
  */
 
 export * from "./types";

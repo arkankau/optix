@@ -75,7 +75,7 @@ pnpm dev
 When you start the API, you'll see:
 
 ```
-🚀 Nearify Exam API Server
+🚀 OptiX Exam API Server
 📡 Listening on http://localhost:8787
 🌐 CORS enabled for http://localhost:5173
 
@@ -107,7 +107,7 @@ For Vercel/production:
    ```
    FRONTEND_ORIGIN=https://your-web-url.vercel.app
    PORT=8787
-   DATABASE_URL=file:./nearify.sqlite
+   DATABASE_URL=file:./OptiX.sqlite
    ```
 
 3. **Database**: Use Vercel Postgres or keep SQLite for demo

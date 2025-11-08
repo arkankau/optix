@@ -1,4 +1,4 @@
-# Nearify Exam — Voice-First Subjective Refraction
+# OptiX Exam — Voice-First Subjective Refraction
 
 A production-grade MVP for distance acuity and astigmatism testing using voice interaction.
 
@@ -18,7 +18,7 @@ A production-grade MVP for distance acuity and astigmatism testing using voice i
 ## 🏗️ Architecture
 
 ```
-nearify-exam/
+OptiX-exam/
 ├── apps/
 │   ├── web/          # Vite + React + TypeScript
 │   └── api/          # Node + Express + TypeScript
@@ -26,7 +26,7 @@ nearify-exam/
 │   ├── core/         # Shared types + algorithms
 │   ├── agent/        # Dedalus, Photon, Grok wrappers
 │   └── voice/        # ElevenLabs + Gemini clients
-└── nearify.sqlite    # Local database
+└── OptiX.sqlite    # Local database
 ```
 
 ## 🚀 Quick Start

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Nearify Exam is now **fully AI-driven**. The ElevenLabs Conversational AI acts as your personal eye examiner, guiding patients through every step from calibration to final results.
+The OptiX Exam is now **fully AI-driven**. The ElevenLabs Conversational AI acts as your personal eye examiner, guiding patients through every step from calibration to final results.
 
 ---
 
@@ -298,7 +298,7 @@ App (with AIProvider)
 Go to your ElevenLabs dashboard and create a new Conversational AI agent:
 
 **Agent Settings:**
-- **Name**: Nearify Eye Examiner
+- **Name**: OptiX Eye Examiner
 - **Voice**: Professional, clear, friendly (recommend: "Rachel" or "Adam")
 - **System Prompt**: Copy from `ELEVENLABS_SYSTEM_PROMPT.md`
 - **Agent ID**: `agent_0801k9h75d11eh2bjnwsmkn9t932` (or your custom ID)

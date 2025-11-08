@@ -65,9 +65,6 @@ export class ElevenLabsConversation {
             console.log('💓 Keepalive ping sent');
           }
         }, 30000);
-        
-        // Automatically start listening after connection
-        await this.startListening();
       };
 
       this.ws.onmessage = (event) => {
@@ -129,8 +126,20 @@ export class ElevenLabsConversation {
 
       switch (data.type) {
         case 'conversation_initiation_metadata':
-          console.log('🎤 Agent ready to speak');
-          // Agent will greet automatically, no need to send initial message
+          console.log('🎤 Agent ready to speak - metadata:', data.conversation_initiation_metadata_event);
+          
+          // Start listening for user audio
+          await this.startListening();
+          
+          // Send initial user audio or text to trigger agent greeting
+          // The agent needs something to respond to
+          if (this.ws?.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify({
+              type: 'user_transcript',
+              user_transcript: 'Hello'
+            }));
+            console.log('👋 Sent initial greeting to trigger agent');
+          }
           break;
 
         case 'audio':
@@ -242,6 +251,8 @@ export class ElevenLabsConversation {
               audio_base_64: base64,
             },
           }));
+          
+          console.log(`🎙️ Sent audio chunk: ${event.data.size} bytes`);
         }
       };
 

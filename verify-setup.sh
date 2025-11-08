@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# Nearify Exam Setup Verification Script
+# OptiX Exam Setup Verification Script
 
-echo "🔍 Verifying Nearify Exam Setup..."
+echo "🔍 Verifying OptiX Exam Setup..."
 echo ""
 
 # Check Node version
@@ -149,7 +149,7 @@ PHOTON_API_KEY=
 DEDALUS_API_KEY=
 FRONTEND_ORIGIN=http://localhost:5173
 PORT=8787
-DATABASE_URL=file:./nearify.sqlite
+DATABASE_URL=file:./OptiX.sqlite
 EOF
     echo "   ✅ Created .env file"
     echo "   ℹ️  Edit .env to add your API keys (optional)"

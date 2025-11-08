@@ -1,10 +1,10 @@
 {
-  "name": "nearify-exam",
+  "name": "OptiX-exam",
   "version": "1.0.0",
   "private": true,
   "description": "Voice-first subjective refraction exam MVP",
   "scripts": {
-    "dev": "concurrently \"pnpm --filter @nearify/api dev\" \"pnpm --filter @nearify/web dev\"",
+    "dev": "concurrently \"pnpm --filter @OptiX/api dev\" \"pnpm --filter @OptiX/web dev\"",
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "clean": "pnpm -r clean"
