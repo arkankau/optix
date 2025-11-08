@@ -91,12 +91,7 @@ export default function JCCTest() {
       setJccStateLocal(response.state);
       setJccState(currentEye, response.state);
 
-      // Check for Grok hint
-      if (response.grokHint && response.grokHint.priority !== 'low') {
-        console.log(`🤖 Grok suggestion: ${response.grokHint.suggestion}`);
-        showGrok(response.grokHint.suggestion);
-        setTimeout(hideGrok, 5000);
-      }
+      // Removed Grok hints - not needed for JCC test
 
       if (response.complete) {
         console.log(`✅ JCC complete for ${currentEye}: cyl=${response.result.cyl}D @ ${response.result.axis}°`);

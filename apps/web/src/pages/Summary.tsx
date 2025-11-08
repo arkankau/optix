@@ -17,8 +17,15 @@ export default function Summary() {
   }, [sessionId]);
 
   const saveFinalRx = async () => {
+    console.log('📊 Checking results:', {
+      'Sphere OD': sphereResults.OD,
+      'Sphere OS': sphereResults.OS,
+      'JCC OD': jccResults.OD,
+      'JCC OS': jccResults.OS,
+    });
+
     if (!sphereResults.OD || !sphereResults.OS || !jccResults.OD || !jccResults.OS) {
-      console.error('Missing results');
+      console.error('❌ Missing results - waiting for test completion');
       return;
     }
 

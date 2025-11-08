@@ -89,12 +89,13 @@ export default function SphereTest() {
   const handleVoiceTranscript = (text: string, confidence: number) => {
     console.log(`🎤 Voice transcription received: "${text}" (${(confidence * 100).toFixed(0)}% confidence)`);
     
-    // Check if patient can't see
+    // Check if patient can't see - IMMEDIATE exit
     const lowerText = text.toLowerCase();
     if (lowerText.includes("can't see") || lowerText.includes("cannot see") || 
-        lowerText.includes("too small") || lowerText.includes("can't read")) {
-      console.log("🛑 Patient indicates they can't see - completing test");
-      handleComplete();
+        lowerText.includes("too small") || lowerText.includes("can't read") ||
+        lowerText.includes("i can't") || lowerText.includes("can not see")) {
+      console.log("🛑 Patient indicates they can't see - IMMEDIATELY completing test");
+      handleComplete(); // No delay, immediate exit
       return;
     }
     
@@ -180,14 +181,14 @@ export default function SphereTest() {
             console.log(`⬇️ Advancing to line ${currentLine + 1}`);
             setTimeout(() => setCurrentLine(currentLine + 1), 1000); // Small delay to show result
           } else {
-            console.log('✅ Reached last line, completing test');
-            setTimeout(() => handleComplete(), 1500);
+            console.log('✅ Reached last line, completing test IMMEDIATELY');
+            handleComplete(); // No delay when reaching end
           }
           break;
           
         case 'complete':
-          console.log('✅ xAI determined patient limit, finishing this eye');
-          setTimeout(() => handleComplete(), 1500);
+          console.log('✅ xAI determined patient limit, finishing this eye IMMEDIATELY');
+          handleComplete(); // No delay when xAI determines limit
           break;
           
         default:
@@ -195,7 +196,7 @@ export default function SphereTest() {
           if (currentLine < 11) {
             setTimeout(() => setCurrentLine(currentLine + 1), 1000);
           } else {
-            setTimeout(() => handleComplete(), 1500);
+            handleComplete(); // No delay on completion
           }
           break;
       }
@@ -247,19 +248,22 @@ export default function SphereTest() {
   };
 
   const handleComplete = () => {
-    // Called when ElevenLabs agent completes the test for this eye
+    // Called when sphere test completes for this eye
     setIsComplete(true);
     
     // Calculate rough sphere from best line read
     const sphereValue = lineToSphere(currentLine);
     
-    setSphereResult(currentEye, {
+    const result = {
       threshold: lineToLogMAR(currentLine),
       sphere: sphereValue,
       confidence: 0.85,
-    });
+    };
+    
+    setSphereResult(currentEye, result);
 
-    console.log(`✅ Sphere test complete for ${currentEye}: line ${currentLine}, sphere=${sphereValue}D`);
+    console.log(`✅ Sphere test complete for ${currentEye}:`, result);
+    console.log(`   Line: ${currentLine}, Sphere: ${sphereValue}D, LogMAR: ${lineToLogMAR(currentLine)}`);
 
     // Move to next eye or astigmatism test
     if (currentEye === 'OD') {
