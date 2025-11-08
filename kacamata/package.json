@@ -6,12 +6,15 @@
   "scripts": {
     "build": "tsc && npm run build:renderer",
     "build:renderer": "vite build",
+    "build:native": "node-gyp rebuild",
+    "rebuild:native": "electron-rebuild -f -w desktop_duplication",
     "dev": "concurrently \"npm run dev:main\" \"npm run dev:renderer\"",
     "dev:main": "tsc --watch",
     "dev:renderer": "vite",
     "start": "electron .",
     "rebuild": "electron-rebuild",
-    "package": "electron-builder"
+    "package": "electron-builder",
+    "install": "npm run build:native || echo 'Native module build failed, will use fallback'"
   },
   "keywords": [
     "vision",
@@ -27,7 +30,10 @@
     "@mediapipe/face_mesh": "^0.4.1633559619",
     "@tensorflow/tfjs": "^4.15.0",
     "@tensorflow/tfjs-core": "^4.15.0",
-    "electron-updater": "^6.1.7"
+    "electron-updater": "^6.1.7",
+    "node-addon-api": "^7.0.0",
+    "node-gyp": "^10.0.0",
+    "@webgpu/types": "^0.1.38"
   },
   "devDependencies": {
     "@types/node": "^20.10.6",

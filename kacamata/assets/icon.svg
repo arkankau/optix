@@ -1,0 +1,19 @@
+<!-- Simple SVG icon for system tray - will be converted to PNG/ICO -->
+<svg width="256" height="256" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#00f260;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0575e6;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Eye outline -->
+  <ellipse cx="128" cy="128" rx="100" ry="60" fill="none" stroke="url(#grad)" stroke-width="8"/>
+  
+  <!-- Iris/Pupil -->
+  <circle cx="128" cy="128" r="35" fill="url(#grad)"/>
+  <circle cx="128" cy="128" r="20" fill="#0a0a0a"/>
+  
+  <!-- Light reflection -->
+  <circle cx="115" cy="115" r="8" fill="white" opacity="0.8"/>
+</svg>

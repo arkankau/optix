@@ -4,6 +4,7 @@ import { Controls } from './Controls';
 import { ImageTestView } from './ImageTestView';
 import { useScreenCapture } from '../hooks/useScreenCapture';
 import { useDistanceTracking } from '../hooks/useDistanceTracking';
+import { FastCPUProcessor } from '../fast-cpu-processor';
 
 interface Props {
   profile: Profile | null;
@@ -18,9 +19,10 @@ export function LiveView({ profile, isOverlay }: Props) {
     return <ImageTestView profile={profile} onBack={() => setShowImageTest(false)} />;
   }
 
-  const [isProcessing, setIsProcessing] = useState(true); // Start with processing ON by default
+  const [isProcessing, setIsProcessing] = useState(false); // Start with processing OFF by default to see the screen first
   const [splitMode, setSplitMode] = useState(true);
   const [lfdInspired, setLfdInspired] = useState(false); // LFD-inspired mode toggle
+  const [useFastCPU, setUseFastCPU] = useState(true); // Use fast CPU processing instead of full Wiener
   const [fps, setFps] = useState(0);
   const [latency, setLatency] = useState(0);
   const [lambda, setLambda] = useState(profile?.wiener_lambda ?? 0.02);
@@ -89,13 +91,13 @@ export function LiveView({ profile, isOverlay }: Props) {
   }, [profile, manualDistance, lfdInspired, myopia, cylinder]);
 
   useEffect(() => {
-    if (!stream || !profile) {
-      console.log('Waiting for stream or profile. Stream:', !!stream, 'Profile:', !!profile);
+    if (!stream) {
+      console.log('Waiting for stream. Stream:', !!stream);
       return;
     }
 
     console.log('Starting capture loop...');
-    // Start capture loop
+    // Start capture loop even without profile - just show the screen
     startCaptureLoop();
 
     return () => {
@@ -103,7 +105,7 @@ export function LiveView({ profile, isOverlay }: Props) {
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [stream, profile, isProcessing, manualDistance, lambda, lfdInspired, myopia, cylinder]);
+  }, [stream, isProcessing, profile, manualDistance, lambda, lfdInspired, myopia, cylinder]);
 
   const startCaptureLoop = () => {
     if (!videoRef.current || !canvasRef.current || !processedCanvasRef.current) {
@@ -160,60 +162,81 @@ export function LiveView({ profile, isOverlay }: Props) {
             console.error('Error drawing video to canvas:', drawError);
           }
 
+          // Set processed canvas dimensions
+          if (processedCanvas.width !== canvas.width || processedCanvas.height !== canvas.height) {
+            processedCanvas.width = canvas.width;
+            processedCanvas.height = canvas.height;
+          }
+
           // Always show the original on the left canvas (for split view)
           // For processed canvas, show either processed or original
           if (isProcessing && profile) {
             // Get image data for processing
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const buffer = imageData.data.buffer;
-
-            // Process frame
-            try {
-            const processed = await window.electronAPI?.vision.processFrame({
-              buffer,
-              width: canvas.width,
-              height: canvas.height,
-              psfParams: {
-                sphere_D: myopia,
-                cylinder_D: cylinder !== 0 ? cylinder : undefined,
-                axis_deg: profile.rx.axis_deg,
-                distance_cm: manualDistance,
-                display_ppi: profile.ppi,
-                display_width_px: profile.display.width_px,
-                display_height_px: profile.display.height_px,
-                display_diag_in: profile.display.diag_in,
-              },
-              lambda,
-              lfd_inspired: lfdInspired,
-              contrast_boost: 1.0,
-            });
-
-              if (processed) {
+            
+            if (useFastCPU) {
+              // Fast CPU processing - no IPC call, all in renderer
+              try {
+                const input = new Uint8Array(imageData.data);
+                const strength = Math.abs(myopia) / 4.0; // Map myopia to sharpening strength
+                const processed = FastCPUProcessor.fastSharpen(
+                  input,
+                  canvas.width,
+                  canvas.height,
+                  Math.max(0.5, Math.min(3.0, strength))
+                );
+                
                 const processedImageData = new ImageData(
                   new Uint8ClampedArray(processed),
                   canvas.width,
                   canvas.height
                 );
-                processedCanvas.width = canvas.width;
-                processedCanvas.height = canvas.height;
                 processedCtx.putImageData(processedImageData, 0, 0);
-              } else {
-                // Fallback: copy original
-                processedCanvas.width = canvas.width;
-                processedCanvas.height = canvas.height;
+              } catch (fastError) {
+                console.error('Fast CPU processing error:', fastError);
                 processedCtx.drawImage(canvas, 0, 0);
               }
-            } catch (processError) {
-              console.error('Frame processing error:', processError);
-              // Fallback: copy original
-              processedCanvas.width = canvas.width;
-              processedCanvas.height = canvas.height;
-              processedCtx.drawImage(canvas, 0, 0);
+            } else {
+              // Full Wiener deconvolution via IPC (slower but more accurate)
+              const buffer = imageData.data.buffer;
+              
+              try {
+                const processed = await window.electronAPI?.vision.processFrame({
+                  buffer,
+                  width: canvas.width,
+                  height: canvas.height,
+                  psfParams: {
+                    sphere_D: myopia,
+                    cylinder_D: cylinder !== 0 ? cylinder : undefined,
+                    axis_deg: profile?.rx.axis_deg,
+                    distance_cm: manualDistance,
+                    display_ppi: profile.ppi,
+                    display_width_px: profile.display.width_px,
+                    display_height_px: profile.display.height_px,
+                    display_diag_in: profile.display.diag_in,
+                  },
+                  lambda,
+                  lfd_inspired: lfdInspired,
+                  contrast_boost: 1.0,
+                });
+
+                if (processed && processed.byteLength > 0) {
+                  const processedImageData = new ImageData(
+                    new Uint8ClampedArray(processed),
+                    canvas.width,
+                    canvas.height
+                  );
+                  processedCtx.putImageData(processedImageData, 0, 0);
+                } else {
+                  processedCtx.drawImage(canvas, 0, 0);
+                }
+              } catch (processError) {
+                console.error('Frame processing error:', processError);
+                processedCtx.drawImage(canvas, 0, 0);
+              }
             }
           } else {
-            // Copy original to processed canvas when not processing
-            processedCanvas.width = canvas.width;
-            processedCanvas.height = canvas.height;
+            // Copy original to processed canvas when not processing (PASSTHROUGH MODE)
             processedCtx.drawImage(canvas, 0, 0);
           }
 
@@ -300,44 +323,112 @@ export function LiveView({ profile, isOverlay }: Props) {
   // No need to manually connect it here
 
   if (isOverlay) {
-    // Full-screen overlay mode
+    // Full-screen overlay mode - transparent background, only show processed output
     return (
       <div
         style={{
           width: '100vw',
           height: '100vh',
-          position: 'relative',
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          margin: 0,
+          padding: 0,
           pointerEvents: 'none',
+          background: 'transparent',
         }}
       >
+        {/* Main processed canvas - fullscreen */}
         <canvas
           ref={processedCanvasRef}
           style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
+            width: '100vw',
+            height: '100vh',
+            display: 'block',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            objectFit: 'contain', // Changed from pixelated to contain for better scaling
+            imageRendering: 'auto',
           }}
         />
+        
+        {/* Hidden original canvas for capture */}
+        <canvas
+          ref={canvasRef}
+          style={{
+            display: 'none',
+          }}
+        />
+        
+        {/* Control overlay - top right corner with toggle */}
         <div
           style={{
-            position: 'absolute',
-            top: '20px',
-            right: '20px',
-            background: 'rgba(0, 0, 0, 0.7)',
+            position: 'fixed',
+            top: '10px',
+            right: '10px',
+            background: 'rgba(0, 0, 0, 0.85)',
             padding: '12px',
             borderRadius: '8px',
-            fontSize: '14px',
+            fontSize: '11px',
+            fontFamily: 'monospace',
+            color: '#0f0',
             pointerEvents: 'auto',
+            zIndex: 999999,
+            backdropFilter: 'blur(10px)',
+            border: '1px solid rgba(0, 255, 0, 0.3)',
+            minWidth: '200px',
           }}
         >
-          <div>FPS: {fps}</div>
-          <div>Latency: {latency}ms</div>
-          <div>Distance: {distance.toFixed(1)}cm</div>
-          <div>
-            σx/σy: {debugInfo.sigmaX.toFixed(3)} / {debugInfo.sigmaY.toFixed(3)}
+          {/* Toggle button */}
+          <button
+            onClick={() => setIsProcessing(!isProcessing)}
+            style={{
+              width: '100%',
+              padding: '8px',
+              marginBottom: '8px',
+              background: isProcessing ? 'linear-gradient(90deg, #00f260, #0575e6)' : 'rgba(255, 0, 0, 0.7)',
+              border: 'none',
+              borderRadius: '4px',
+              color: '#fff',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              fontSize: '12px',
+            }}
+          >
+            {isProcessing ? '✓ Filter ON' : '⏸ Filter OFF'}
+          </button>
+          
+          {/* Fast/Full toggle */}
+          {isProcessing && (
+            <button
+              onClick={() => setUseFastCPU(!useFastCPU)}
+              style={{
+                width: '100%',
+                padding: '6px',
+                marginBottom: '8px',
+                background: useFastCPU ? 'rgba(0, 255, 0, 0.2)' : 'rgba(255, 165, 0, 0.3)',
+                border: '1px solid ' + (useFastCPU ? '#0f0' : '#ffa500'),
+                borderRadius: '4px',
+                color: '#fff',
+                fontSize: '10px',
+                cursor: 'pointer',
+              }}
+            >
+              {useFastCPU ? 'Fast Mode' : 'Full Mode'}
+            </button>
+          )}
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '10px' }}>
+            <span>FPS: {fps} | {latency}ms</span>
+            <span>Distance: {distance.toFixed(0)}cm</span>
+            {isProcessing && (
+              <>
+                <span>Myopia: {myopia.toFixed(1)}D</span>
+                {!useFastCPU && <span>Lambda: {lambda.toFixed(3)}</span>}
+              </>
+            )}
           </div>
-          <div>λ: {debugInfo.lambda.toFixed(4)}</div>
-          <div>Bypass: {debugInfo.bypass ? 'true' : 'false'}</div>
         </div>
       </div>
     );

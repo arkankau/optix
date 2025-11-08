@@ -41,10 +41,13 @@ const capture_manager_1 = require("./native/capture-manager");
 const distance_tracker_1 = require("./core/distance-tracker");
 let mainWindow = null;
 let overlayWindow = null;
+let controlPanel = null;
+let tray = null;
 let profileManager;
 let visionEngine;
 let captureManager;
 let distanceTracker;
+let overlayEnabled = false;
 function createMainWindow() {
     mainWindow = new electron_1.BrowserWindow({
         width: 1200,
@@ -80,8 +83,10 @@ function createMainWindow() {
     });
 }
 function createOverlayWindow() {
+    if (overlayWindow)
+        return;
     const primaryDisplay = electron_1.screen.getPrimaryDisplay();
-    const { width, height } = primaryDisplay.workAreaSize;
+    const { width, height } = primaryDisplay.bounds;
     overlayWindow = new electron_1.BrowserWindow({
         width,
         height,
@@ -92,22 +97,135 @@ function createOverlayWindow() {
         alwaysOnTop: true,
         skipTaskbar: true,
         resizable: false,
+        hasShadow: false,
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             nodeIntegration: false,
             contextIsolation: true,
+            backgroundThrottling: false, // Prevent throttling for smooth 60fps
         },
     });
+    // Make window click-through but allow interaction with UI elements
     overlayWindow.setIgnoreMouseEvents(true, { forward: true });
     overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-    if (process.env.NODE_ENV === 'development') {
-        overlayWindow.loadURL('http://localhost:5173/overlay');
+    // Set as always on top with highest level
+    overlayWindow.setAlwaysOnTop(true, 'screen-saver', 1);
+    const isDev = process.env.NODE_ENV === 'development' || !electron_1.app.isPackaged;
+    if (isDev) {
+        overlayWindow.loadURL('http://localhost:5173/#overlay').catch(() => {
+            overlayWindow?.loadFile(path.join(__dirname, 'renderer/index.html'), {
+                hash: 'overlay',
+            });
+        });
+        // Uncomment for debugging overlay
+        // overlayWindow.webContents.openDevTools({ mode: 'detach' });
     }
     else {
         overlayWindow.loadFile(path.join(__dirname, 'renderer/index.html'), {
             hash: 'overlay',
         });
     }
+    overlayWindow.on('closed', () => {
+        overlayWindow = null;
+        overlayEnabled = false;
+        updateTrayMenu();
+    });
+    overlayEnabled = true;
+    updateTrayMenu();
+}
+function createControlPanel() {
+    if (controlPanel) {
+        controlPanel.focus();
+        return;
+    }
+    controlPanel = new electron_1.BrowserWindow({
+        width: 400,
+        height: 600,
+        resizable: false,
+        frame: true,
+        alwaysOnTop: true,
+        skipTaskbar: false,
+        webPreferences: {
+            preload: path.join(__dirname, 'preload.js'),
+            nodeIntegration: false,
+            contextIsolation: true,
+        },
+        title: 'Clarity Controls',
+    });
+    const isDev = process.env.NODE_ENV === 'development' || !electron_1.app.isPackaged;
+    if (isDev) {
+        controlPanel.loadURL('http://localhost:5173/#controls').catch(() => {
+            controlPanel?.loadFile(path.join(__dirname, 'renderer/index.html'), {
+                hash: 'controls',
+            });
+        });
+    }
+    else {
+        controlPanel.loadFile(path.join(__dirname, 'renderer/index.html'), {
+            hash: 'controls',
+        });
+    }
+    controlPanel.on('closed', () => {
+        controlPanel = null;
+    });
+}
+function toggleOverlay() {
+    if (overlayWindow) {
+        overlayWindow.destroy();
+        overlayWindow = null;
+        overlayEnabled = false;
+    }
+    else {
+        createOverlayWindow();
+        overlayEnabled = true;
+    }
+    updateTrayMenu();
+}
+function createTray() {
+    // Create a simple icon for the tray (you'll want to add proper icon files)
+    const icon = electron_1.nativeImage.createFromPath(path.join(__dirname, '../assets/icon.png')).resize({ width: 16, height: 16 });
+    tray = new electron_1.Tray(icon);
+    updateTrayMenu();
+    tray.setToolTip('Clarity - Vision Correction Overlay');
+    tray.on('click', () => {
+        if (controlPanel) {
+            controlPanel.focus();
+        }
+        else {
+            createControlPanel();
+        }
+    });
+}
+function updateTrayMenu() {
+    if (!tray)
+        return;
+    const contextMenu = electron_1.Menu.buildFromTemplate([
+        {
+            label: overlayEnabled ? 'Hide Overlay' : 'Show Overlay',
+            click: toggleOverlay,
+        },
+        {
+            label: 'Control Panel',
+            click: createControlPanel,
+        },
+        { type: 'separator' },
+        {
+            label: 'Setup Wizard',
+            click: () => {
+                if (!mainWindow)
+                    createMainWindow();
+                mainWindow?.focus();
+            },
+        },
+        { type: 'separator' },
+        {
+            label: 'Quit',
+            click: () => {
+                electron_1.app.quit();
+            },
+        },
+    ]);
+    tray.setContextMenu(contextMenu);
 }
 electron_1.app.whenReady().then(() => {
     // Initialize core modules
@@ -115,22 +233,40 @@ electron_1.app.whenReady().then(() => {
     visionEngine = new vision_engine_1.VisionEngine();
     captureManager = new capture_manager_1.CaptureManager();
     distanceTracker = new distance_tracker_1.DistanceTracker();
-    createMainWindow();
-    // Register global shortcuts
-    electron_1.globalShortcut.register('CommandOrControl+E', () => {
-        if (overlayWindow) {
-            overlayWindow.destroy();
-            overlayWindow = null;
+    // Create system tray
+    createTray();
+    // Start with setup wizard on first run, or control panel if profile exists
+    try {
+        const profiles = profileManager.listProfiles();
+        if (profiles && profiles.length > 0) {
+            // User has profiles - start overlay and show control panel
+            createOverlayWindow();
+            createControlPanel();
         }
         else {
-            createOverlayWindow();
+            // First run - show setup wizard
+            createMainWindow();
         }
+    }
+    catch (error) {
+        // Error loading profiles - show setup wizard
+        console.error('Error loading profiles:', error);
+        createMainWindow();
+    }
+    // Register global shortcuts
+    electron_1.globalShortcut.register('CommandOrControl+Shift+O', () => {
+        toggleOverlay();
+    });
+    electron_1.globalShortcut.register('CommandOrControl+Shift+C', () => {
+        createControlPanel();
     });
     electron_1.globalShortcut.register('CommandOrControl+S', () => {
         mainWindow?.webContents.send('toggle-split-mode');
+        overlayWindow?.webContents.send('toggle-split-mode');
     });
     electron_1.globalShortcut.register('CommandOrControl+R', () => {
         mainWindow?.webContents.send('recalibrate');
+        controlPanel?.webContents.send('recalibrate');
     });
     electron_1.app.on('activate', () => {
         if (electron_1.BrowserWindow.getAllWindows().length === 0) {
@@ -139,9 +275,8 @@ electron_1.app.whenReady().then(() => {
     });
 });
 electron_1.app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') {
-        electron_1.app.quit();
-    }
+    // Don't quit on window close - keep running in system tray
+    // User must explicitly quit from tray menu
 });
 electron_1.app.on('will-quit', () => {
     electron_1.globalShortcut.unregisterAll();

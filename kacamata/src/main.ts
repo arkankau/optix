@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, globalShortcut, screen } from 'electron';
+import { app, BrowserWindow, ipcMain, globalShortcut, screen, Tray, Menu, nativeImage } from 'electron';
 import * as path from 'path';
 import { ProfileManager } from './core/profile-manager';
 import { VisionEngine } from './core/vision-engine';
@@ -7,10 +7,13 @@ import { DistanceTracker } from './core/distance-tracker';
 
 let mainWindow: BrowserWindow | null = null;
 let overlayWindow: BrowserWindow | null = null;
+let controlPanel: BrowserWindow | null = null;
+let tray: Tray | null = null;
 let profileManager: ProfileManager;
 let visionEngine: VisionEngine;
 let captureManager: CaptureManager;
 let distanceTracker: DistanceTracker;
+let overlayEnabled = false;
 
 function createMainWindow() {
   mainWindow = new BrowserWindow({
@@ -52,8 +55,10 @@ function createMainWindow() {
 }
 
 function createOverlayWindow() {
+  if (overlayWindow) return;
+
   const primaryDisplay = screen.getPrimaryDisplay();
-  const { width, height } = primaryDisplay.workAreaSize;
+  const { width, height } = primaryDisplay.bounds;
 
   overlayWindow = new BrowserWindow({
     width,
@@ -65,23 +70,150 @@ function createOverlayWindow() {
     alwaysOnTop: true,
     skipTaskbar: true,
     resizable: false,
+    hasShadow: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
+      backgroundThrottling: false, // Prevent throttling for smooth 60fps
     },
   });
 
+  // Make window click-through but allow interaction with UI elements
   overlayWindow.setIgnoreMouseEvents(true, { forward: true });
   overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  
+  // Set as always on top with highest level
+  overlayWindow.setAlwaysOnTop(true, 'screen-saver', 1);
 
-  if (process.env.NODE_ENV === 'development') {
-    overlayWindow.loadURL('http://localhost:5173/overlay');
+  const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+  
+  if (isDev) {
+    overlayWindow.loadURL('http://localhost:5173/#overlay').catch(() => {
+      overlayWindow?.loadFile(path.join(__dirname, 'renderer/index.html'), {
+        hash: 'overlay',
+      });
+    });
+    // Uncomment for debugging overlay
+    // overlayWindow.webContents.openDevTools({ mode: 'detach' });
   } else {
     overlayWindow.loadFile(path.join(__dirname, 'renderer/index.html'), {
       hash: 'overlay',
     });
   }
+
+  overlayWindow.on('closed', () => {
+    overlayWindow = null;
+    overlayEnabled = false;
+    updateTrayMenu();
+  });
+
+  overlayEnabled = true;
+  updateTrayMenu();
+}
+
+function createControlPanel() {
+  if (controlPanel) {
+    controlPanel.focus();
+    return;
+  }
+
+  controlPanel = new BrowserWindow({
+    width: 400,
+    height: 600,
+    resizable: false,
+    frame: true,
+    alwaysOnTop: true,
+    skipTaskbar: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      nodeIntegration: false,
+      contextIsolation: true,
+    },
+    title: 'Clarity Controls',
+  });
+
+  const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+  
+  if (isDev) {
+    controlPanel.loadURL('http://localhost:5173/#controls').catch(() => {
+      controlPanel?.loadFile(path.join(__dirname, 'renderer/index.html'), {
+        hash: 'controls',
+      });
+    });
+  } else {
+    controlPanel.loadFile(path.join(__dirname, 'renderer/index.html'), {
+      hash: 'controls',
+    });
+  }
+
+  controlPanel.on('closed', () => {
+    controlPanel = null;
+  });
+}
+
+function toggleOverlay() {
+  if (overlayWindow) {
+    overlayWindow.destroy();
+    overlayWindow = null;
+    overlayEnabled = false;
+  } else {
+    createOverlayWindow();
+    overlayEnabled = true;
+  }
+  updateTrayMenu();
+}
+
+function createTray() {
+  // Create a simple icon for the tray (you'll want to add proper icon files)
+  const icon = nativeImage.createFromPath(
+    path.join(__dirname, '../assets/icon.png')
+  ).resize({ width: 16, height: 16 });
+  
+  tray = new Tray(icon);
+  updateTrayMenu();
+  
+  tray.setToolTip('Clarity - Vision Correction Overlay');
+  
+  tray.on('click', () => {
+    if (controlPanel) {
+      controlPanel.focus();
+    } else {
+      createControlPanel();
+    }
+  });
+}
+
+function updateTrayMenu() {
+  if (!tray) return;
+  
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: overlayEnabled ? 'Hide Overlay' : 'Show Overlay',
+      click: toggleOverlay,
+    },
+    {
+      label: 'Control Panel',
+      click: createControlPanel,
+    },
+    { type: 'separator' },
+    {
+      label: 'Setup Wizard',
+      click: () => {
+        if (!mainWindow) createMainWindow();
+        mainWindow?.focus();
+      },
+    },
+    { type: 'separator' },
+    {
+      label: 'Quit',
+      click: () => {
+        app.quit();
+      },
+    },
+  ]);
+  
+  tray.setContextMenu(contextMenu);
 }
 
 app.whenReady().then(() => {
@@ -91,24 +223,43 @@ app.whenReady().then(() => {
   captureManager = new CaptureManager();
   distanceTracker = new DistanceTracker();
 
-  createMainWindow();
+  // Create system tray
+  createTray();
+
+  // Start with setup wizard on first run, or control panel if profile exists
+  try {
+    const profiles = profileManager.listProfiles();
+    if (profiles && profiles.length > 0) {
+      // User has profiles - start overlay and show control panel
+      createOverlayWindow();
+      createControlPanel();
+    } else {
+      // First run - show setup wizard
+      createMainWindow();
+    }
+  } catch (error) {
+    // Error loading profiles - show setup wizard
+    console.error('Error loading profiles:', error);
+    createMainWindow();
+  }
 
   // Register global shortcuts
-  globalShortcut.register('CommandOrControl+E', () => {
-    if (overlayWindow) {
-      overlayWindow.destroy();
-      overlayWindow = null;
-    } else {
-      createOverlayWindow();
-    }
+  globalShortcut.register('CommandOrControl+Shift+O', () => {
+    toggleOverlay();
+  });
+
+  globalShortcut.register('CommandOrControl+Shift+C', () => {
+    createControlPanel();
   });
 
   globalShortcut.register('CommandOrControl+S', () => {
     mainWindow?.webContents.send('toggle-split-mode');
+    overlayWindow?.webContents.send('toggle-split-mode');
   });
 
   globalShortcut.register('CommandOrControl+R', () => {
     mainWindow?.webContents.send('recalibrate');
+    controlPanel?.webContents.send('recalibrate');
   });
 
   app.on('activate', () => {
@@ -119,9 +270,8 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  // Don't quit on window close - keep running in system tray
+  // User must explicitly quit from tray menu
 });
 
 app.on('will-quit', () => {
