@@ -81,6 +81,11 @@ export default function ElevenLabsWidget({
   useEffect(() => {
     // Listen for widget events
     const handleMessage = (event: MessageEvent) => {
+      // Log ALL postMessage events from ElevenLabs for debugging
+      if (event.data && typeof event.data === 'object') {
+        console.log('📨 PostMessage received:', event.data);
+      }
+      
       if (event.data.type === 'elevenlabs-message') {
         const { message, isUser } = event.data;
         console.log(`🎤 Widget ${isUser ? 'User' : 'AI'}: ${message}`);

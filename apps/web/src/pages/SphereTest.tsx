@@ -303,28 +303,34 @@ export default function SphereTest() {
         </div>
 
         {/* Patient Transcription Display */}
-        {patientTranscriptions.length > 0 && (
-          <div style={{
-            padding: '1rem',
-            background: 'rgba(16, 185, 129, 0.1)',
-            border: '1px solid rgba(16, 185, 129, 0.3)',
-            borderRadius: '0.5rem',
-            maxWidth: '600px',
-            width: '100%',
-          }}>
-            <p style={{ fontSize: '0.875rem', color: 'var(--color-text)', marginBottom: '0.5rem' }}>
-              <strong>👤 You said:</strong>
-            </p>
-            <p style={{ fontSize: '1rem', color: 'var(--color-text)' }}>
-              "{patientTranscriptions[patientTranscriptions.length - 1].text}"
-            </p>
-            {analyzing && (
-              <p style={{ fontSize: '0.75rem', color: 'var(--color-text-dim)', marginTop: '0.5rem' }}>
-                🧠 Analyzing with xAI...
+        <div style={{
+          padding: '1rem',
+          background: patientTranscriptions.length > 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(251, 191, 36, 0.1)',
+          border: `1px solid ${patientTranscriptions.length > 0 ? 'rgba(16, 185, 129, 0.3)' : 'rgba(251, 191, 36, 0.3)'}`,
+          borderRadius: '0.5rem',
+          maxWidth: '600px',
+          width: '100%',
+        }}>
+          <p style={{ fontSize: '0.875rem', color: 'var(--color-text)', marginBottom: '0.5rem' }}>
+            <strong>👤 Your Transcription:</strong>
+          </p>
+          {patientTranscriptions.length > 0 ? (
+            <>
+              <p style={{ fontSize: '1rem', color: 'var(--color-text)' }}>
+                "{patientTranscriptions[patientTranscriptions.length - 1].text}"
               </p>
-            )}
-          </div>
-        )}
+              {analyzing && (
+                <p style={{ fontSize: '0.75rem', color: 'var(--color-text-dim)', marginTop: '0.5rem' }}>
+                  🧠 Analyzing with xAI...
+                </p>
+              )}
+            </>
+          ) : (
+            <p style={{ fontSize: '0.875rem', color: 'var(--color-text-dim)', fontStyle: 'italic' }}>
+              Waiting for you to speak... (Total transcriptions: {patientTranscriptions.length})
+            </p>
+          )}
+        </div>
 
         {/* xAI Analysis Result */}
         {currentAnalysis && currentAnalysis.eye === currentEye && (
