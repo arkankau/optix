@@ -4,6 +4,7 @@ import { useTestStore } from '../store/testStore';
 import { useAI } from '../contexts/AIContext';
 import FixedLettersChart from '../components/FixedLettersChart';
 import AlertBanner from '../components/AlertBanner';
+import VoiceButton from '../components/VoiceButton';
 import { api } from '../api/client';
 import { formatDiopter } from '../services/xaiAnalyzer';
 
@@ -82,6 +83,23 @@ export default function SphereTest() {
       analyzePatientResponse(latestTranscription.text);
     }
   }, [patientTranscriptions, currentEye]);
+
+  // Handle voice transcription from VoiceButton
+  const handleVoiceTranscript = (text: string, confidence: number) => {
+    console.log(`🎤 Voice transcription received: "${text}" (${(confidence * 100).toFixed(0)}% confidence)`);
+    
+    // Store the transcription
+    addPatientTranscription({
+      timestamp: Date.now(),
+      text,
+      eye: currentEye,
+      line: currentLine,
+      stage: `sphere_${currentEye.toLowerCase()}`,
+    });
+
+    // Trigger xAI analysis
+    analyzePatientResponse(text);
+  };
 
   const analyzePatientResponse = async (patientSpeech: string) => {
     if (analyzing) return;
@@ -291,16 +309,22 @@ export default function SphereTest() {
           maxWidth: '600px',
         }}>
           <p style={{ fontSize: '1rem', color: 'var(--color-text)', marginBottom: '0.5rem' }}>
-            <strong>🎤 AI-Guided Testing</strong>
+            <strong>🎤 Voice Testing</strong>
           </p>
           <p style={{ fontSize: '0.875rem', color: 'var(--color-text-dim)' }}>
-            Your AI examiner will guide you through the chart line by line.
-            {' '}Simply speak your responses naturally.
+            Hold the button and read the letters you can see on line {currentLine}.
+            {' '}Release when done.
           </p>
           <p style={{ fontSize: '0.875rem', color: 'var(--color-text-dim)', marginTop: '0.5rem' }}>
             Current line: <strong>{currentLine}</strong> ({getLineLabel(currentLine)})
           </p>
         </div>
+
+        {/* Voice Button */}
+        <VoiceButton 
+          onTranscript={handleVoiceTranscript}
+          disabled={analyzing || isComplete}
+        />
 
         {/* Patient Transcription Display */}
         <div style={{
