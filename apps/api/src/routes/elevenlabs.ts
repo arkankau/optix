@@ -118,11 +118,12 @@ router.post('/signed-url', async (req, res) => {
 
     // Get signed URL for WebSocket connection
     const client = getElevenLabsClient();
-    const signedUrl = await client.conversationalAi.getSignedUrl({
+    const response = await client.conversationalAi.conversations.getSignedUrl({
       agentId,
     });
 
-    res.json({ signedUrl });
+    console.log('✅ Got signed URL');
+    res.json({ signedUrl: response.signedUrl });
   } catch (error: any) {
     console.error('❌ Error getting signed URL:', error);
     res.status(500).json({
