@@ -1,75 +1,101 @@
-import { useState, useRef } from 'react';
-import { api } from '../api/client';
+import { useState, useRef, useEffect } from 'react';
 
 interface VoiceButtonProps {
   onTranscript: (text: string, confidence: number) => void;
   disabled?: boolean;
 }
 
+// Check if browser supports Web Speech API
+const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
 export default function VoiceButton({ onTranscript, disabled }: VoiceButtonProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
+  const recognitionRef = useRef<any>(null);
 
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-      chunksRef.current = [];
+  useEffect(() => {
+    if (!SpeechRecognition) {
+      console.error('❌ Web Speech API not supported in this browser');
+      return;
+    }
 
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          chunksRef.current.push(e.data);
-        }
-      };
+    // Initialize speech recognition
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+    recognition.maxAlternatives = 1;
 
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
-        setIsProcessing(true);
-
-        try {
-          console.log('🎤 Sending audio to Gemini STT...');
-          const result = await api.stt(audioBlob);
-          console.log(`🎤 Gemini parsed: "${result.text}" (${(result.confidence * 100).toFixed(0)}%)`);
-          onTranscript(result.text, result.confidence);
-        } catch (error) {
-          console.error('STT error:', error);
-          // Fallback for demo
-          onTranscript('C D Z O P', 0.7);
-        } finally {
-          setIsProcessing(false);
-        }
-
-        // Stop all tracks
-        stream.getTracks().forEach(track => track.stop());
-      };
-
-      mediaRecorder.start();
+    recognition.onstart = () => {
+      console.log('🎤 Speech recognition started');
       setIsRecording(true);
-      console.log('🎤 Recording started...');
+    };
+
+    recognition.onresult = (event: any) => {
+      const result = event.results[0][0];
+      const transcript = result.transcript.toUpperCase().trim();
+      const confidence = result.confidence;
+      
+      console.log(`🎤 Browser STT parsed: "${transcript}" (${(confidence * 100).toFixed(0)}% confidence)`);
+      
+      setIsProcessing(false);
+      setIsRecording(false);
+      onTranscript(transcript, confidence);
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error('❌ Speech recognition error:', event.error);
+      setIsProcessing(false);
+      setIsRecording(false);
+      
+      if (event.error === 'no-speech') {
+        alert('No speech detected. Please try again.');
+      } else if (event.error === 'not-allowed') {
+        alert('Microphone access denied. Please enable microphone permissions.');
+      }
+    };
+
+    recognition.onend = () => {
+      console.log('🎤 Speech recognition ended');
+      setIsRecording(false);
+      setIsProcessing(false);
+    };
+
+    recognitionRef.current = recognition;
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.abort();
+      }
+    };
+  }, [onTranscript]);
+
+  const startRecording = () => {
+    if (!SpeechRecognition) {
+      alert('Speech recognition is not supported in your browser. Please use Chrome or Edge.');
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+      recognitionRef.current?.start();
     } catch (error) {
-      console.error('Microphone access error:', error);
-      alert('Microphone access denied. Please enable microphone permissions.');
+      console.error('Failed to start recognition:', error);
+      setIsProcessing(false);
     }
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      console.log('🎤 Recording stopped');
+    if (recognitionRef.current && isRecording) {
+      recognitionRef.current.stop();
+      console.log('🎤 Stopping speech recognition...');
     }
   };
 
   return (
     <button
       className="btn btn-primary btn-large"
-      onMouseDown={startRecording}
-      onMouseUp={stopRecording}
-      onTouchStart={startRecording}
-      onTouchEnd={stopRecording}
+      onClick={isRecording ? stopRecording : startRecording}
       disabled={disabled || isProcessing}
       style={{
         position: 'relative',
@@ -87,15 +113,15 @@ export default function VoiceButton({ onTranscript, disabled }: VoiceButtonProps
       {isProcessing ? (
         <>
           <Spinner />
-          Processing...
+          Starting...
         </>
       ) : isRecording ? (
         <>
-          🎤 Recording... (release to stop)
+          🎤 Listening... (click to stop)
         </>
       ) : (
         <>
-          🎤 Hold to Speak
+          🎤 Click to Speak
         </>
       )}
       

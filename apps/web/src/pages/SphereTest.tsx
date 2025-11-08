@@ -184,10 +184,9 @@ export default function SphereTest() {
     }
   };
 
-  // Get expected letters for a line (simplified version)
+  // Get expected letters for a line - ACTUAL letters from the eye chart image
   const getExpectedLettersForLine = (line: number): string => {
-    // In a real implementation, this would come from the actual chart data
-    // For now, return placeholder
+    // These are the REAL letters from /assets/eye-chart.png
     const letters: Record<number, string> = {
       1: 'E',
       2: 'F P',
@@ -198,8 +197,8 @@ export default function SphereTest() {
       7: 'F E L O P Z D',
       8: 'D E F P O T E C',
       9: 'L E F O D P C T',
-      10: 'F D P L T C E O',
-      11: 'P E Z O L C F T D',
+      10: 'F D F L T C E O',  // Note: Chart has F D F (not F D P)
+      11: 'F E Z O L C F T D',  // Note: Chart starts with F (not P)
     };
     return letters[line] || 'UNKNOWN';
   };
@@ -313,8 +312,8 @@ export default function SphereTest() {
             <strong>🎤 Voice Testing</strong>
           </p>
           <p style={{ fontSize: '0.875rem', color: 'var(--color-text-dim)' }}>
-            Hold the button and read the letters you can see on line {currentLine}.
-            {' '}Release when done.
+            Click the button and read the letters you can see on line {currentLine}.
+            {' '}Speak clearly and the browser will transcribe automatically.
           </p>
           <p style={{ fontSize: '0.875rem', color: 'var(--color-text-dim)', marginTop: '0.5rem' }}>
             Current line: <strong>{currentLine}</strong> ({getLineLabel(currentLine)})
