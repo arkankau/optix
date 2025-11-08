@@ -221,12 +221,12 @@ router.post('/analyze-response', async (req, res) => {
     // Build analysis prompt for Grok
     const systemPrompt = `You are an expert optometrist analyzing patient responses during an eye examination.
 
-Your task is to:
-1. Compare what the patient said to what they should have said
-2. Determine if they read the letters correctly (accounting for common mistakes like "O" vs "D", "B" vs "D", etc.)
-3. Assess their performance level
-4. Calculate suggested diopter correction
-5. Recommend whether to advance to smaller lines, stay on current line, or go back to larger lines
+CRITICAL RULES:
+1. ALWAYS advance to smaller lines unless patient shows clear struggling (2+ consecutive errors on same line)
+2. Use "complete" ONLY when you're confident you've found the patient's vision limit (smallest line they can read)
+3. Never use "stay" - either advance or complete
+4. Be lenient with similar letters (O/D, F/E, P/B, C/G)
+5. Goal: Find the SMALLEST line the patient can read to determine their diopter level
 
 Visual Acuity Scale (Snellen):
 - Line 1: 20/200 (largest)
@@ -238,12 +238,13 @@ Visual Acuity Scale (Snellen):
 - Line 7: 20/25
 - Line 8: 20/20 (normal vision, 0D)
 - Line 9: 20/15
-- Line 10: 20/10 (smallest)
+- Line 10: 20/10
+- Line 11: 20/10 (smallest)
 
 Diopter Calculation:
 - Line 8 (20/20) = 0D (no correction)
-- Each line above 8 = approximately +0.25D worse
-- Each line below 8 = better than normal (negative diopter if myopic)
+- Each line above 8 = approximately +0.25D worse vision
+- Each line below 8 = better than normal
 
 Previous Performance: ${JSON.stringify(previousPerformance)}`;
 
@@ -252,18 +253,18 @@ Previous Performance: ${JSON.stringify(previousPerformance)}`;
 Expected letters: "${expectedLetters}"
 Patient said: "${patientSpeech}"
 
-Analyze:
-1. Did they read correctly? (be lenient with common letter confusions)
-2. Confidence level (0-1)
-3. What diopter correction does this suggest?
-4. Should we: "advance" (try smaller line), "stay" (repeat), "go_back" (larger line), or "complete" (finish this eye)?
+Decision Logic:
+- If correct OR close (1 letter off): "advance" to next line
+- If wrong but this is first error: "advance" (patient might do better on next line)
+- If 2+ errors on same line: "complete" (found their limit)
+- If reached line 11: "complete" (end of chart)
 
 Respond in JSON format:
 {
   "correct": boolean,
   "confidence": number,
   "suggestedDiopter": number,
-  "recommendation": "advance" | "stay" | "go_back" | "complete",
+  "recommendation": "advance" | "complete",
   "reasoning": "brief explanation"
 }`;
 

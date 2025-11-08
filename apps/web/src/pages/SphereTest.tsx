@@ -89,17 +89,43 @@ export default function SphereTest() {
   const handleVoiceTranscript = (text: string, confidence: number) => {
     console.log(`🎤 Voice transcription received: "${text}" (${(confidence * 100).toFixed(0)}% confidence)`);
     
+    // Check if patient can't see
+    const lowerText = text.toLowerCase();
+    if (lowerText.includes("can't see") || lowerText.includes("cannot see") || 
+        lowerText.includes("too small") || lowerText.includes("can't read")) {
+      console.log("🛑 Patient indicates they can't see - completing test");
+      handleComplete();
+      return;
+    }
+    
+    // Normalize transcription: add spaces between letters if needed
+    const normalizedText = normalizeLetterTranscript(text);
+    console.log(`📝 Normalized: "${normalizedText}"`);
+    
     // Store the transcription
     addPatientTranscription({
       timestamp: Date.now(),
-      text,
+      text: normalizedText,
       eye: currentEye,
       line: currentLine,
       stage: `sphere_${currentEye.toLowerCase()}`,
     });
 
     // Trigger xAI analysis
-    analyzePatientResponse(text);
+    analyzePatientResponse(normalizedText);
+  };
+
+  // Normalize letter transcripts (e.g., "FP" -> "F P")
+  const normalizeLetterTranscript = (text: string): string => {
+    // If it's already spaced, return as-is
+    if (text.includes(' ')) return text;
+    
+    // If it's multiple letters without spaces, add spaces
+    if (text.length > 1 && /^[A-Z]+$/.test(text)) {
+      return text.split('').join(' ');
+    }
+    
+    return text;
   };
 
   const analyzePatientResponse = async (patientSpeech: string) => {
@@ -152,28 +178,25 @@ export default function SphereTest() {
         case 'advance':
           if (currentLine < 11) {
             console.log(`⬇️ Advancing to line ${currentLine + 1}`);
-            setCurrentLine(currentLine + 1);
+            setTimeout(() => setCurrentLine(currentLine + 1), 1000); // Small delay to show result
           } else {
             console.log('✅ Reached last line, completing test');
-            handleComplete();
-          }
-          break;
-          
-        case 'go_back':
-          if (currentLine > 1) {
-            console.log(`⬆️ Going back to line ${currentLine - 1}`);
-            setCurrentLine(currentLine - 1);
+            setTimeout(() => handleComplete(), 1500);
           }
           break;
           
         case 'complete':
-          console.log('✅ xAI says test is complete, finishing this eye');
-          handleComplete();
+          console.log('✅ xAI determined patient limit, finishing this eye');
+          setTimeout(() => handleComplete(), 1500);
           break;
           
-        case 'stay':
         default:
-          console.log('⏸️ Staying on current line');
+          console.log('⏸️ Unknown recommendation, advancing by default');
+          if (currentLine < 11) {
+            setTimeout(() => setCurrentLine(currentLine + 1), 1000);
+          } else {
+            setTimeout(() => handleComplete(), 1500);
+          }
           break;
       }
 

@@ -7,7 +7,7 @@ interface AnalysisResult {
   correct: boolean;
   confidence: number;
   suggestedDiopter: number;
-  recommendation: 'advance' | 'stay' | 'go_back' | 'complete';
+  recommendation: 'advance' | 'complete';
   reasoning: string;
 }
 
@@ -48,13 +48,13 @@ export async function analyzePatientResponse(
   } catch (error) {
     console.error('❌ xAI Analysis error:', error);
     
-    // Fallback analysis
+    // Fallback analysis - advance by default
     return {
       correct: false,
       confidence: 0,
       suggestedDiopter: 0,
-      recommendation: 'stay',
-      reasoning: 'Analysis service unavailable',
+      recommendation: 'advance',
+      reasoning: 'Analysis service unavailable - advancing by default',
     };
   }
 }
