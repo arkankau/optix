@@ -56,10 +56,17 @@ export default function SphereTest() {
       return;
     }
 
+    // Set the appropriate stage based on current eye
+    const expectedStage = `sphere_${currentEye.toLowerCase()}` as 'sphere_od' | 'sphere_os';
+    if (stage !== expectedStage) {
+      console.log(`📍 Setting stage to ${expectedStage}`);
+      setStage(expectedStage);
+    }
+
     if (widgetReady) {
       initTest();
     }
-  }, [sessionId, calibration, currentEye, widgetReady]);
+  }, [sessionId, calibration, currentEye, widgetReady, stage, setStage]);
 
   // Watch for new patient transcriptions and analyze them
   useEffect(() => {

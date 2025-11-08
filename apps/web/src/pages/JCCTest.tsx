@@ -35,12 +35,15 @@ export default function JCCTest() {
       return;
     }
 
-    if (stage === 'sphere_os') {
-      setStage('jcc_od');
+    // Set the appropriate JCC stage based on current eye
+    const expectedStage = `jcc_${currentEye.toLowerCase()}` as 'jcc_od' | 'jcc_os';
+    if (stage !== expectedStage && stage !== 'complete') {
+      console.log(`📍 Setting stage to ${expectedStage}`);
+      setStage(expectedStage);
     }
 
     initJCC();
-  }, [sessionId, calibration, currentEye]);
+  }, [sessionId, calibration, currentEye, stage, setStage]);
 
   const initJCC = async () => {
     try {

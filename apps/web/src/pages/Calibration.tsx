@@ -4,15 +4,19 @@ import { useTestStore } from '../store/testStore';
 
 export default function Calibration() {
   const navigate = useNavigate();
-  const { sessionId, setCalibration } = useTestStore();
+  const { sessionId, setCalibration, setStage } = useTestStore();
   const [cardWidthPx, setCardWidthPx] = useState(300);
   const [distance, setDistance] = useState(60);
 
   useEffect(() => {
     if (!sessionId) {
       navigate('/');
+    } else {
+      // Set stage to calibration when component mounts
+      console.log('📍 Setting stage to calibration');
+      setStage('calibration');
     }
-  }, [sessionId, navigate]);
+  }, [sessionId, navigate, setStage]);
 
   const handleComplete = () => {
     // Credit card standard width: 85.6mm = 8.56cm
