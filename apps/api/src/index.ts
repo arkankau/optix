@@ -5,9 +5,10 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import path from "path";
 
-// Load environment variables
-dotenv.config({ path: "../../.env" });
+// Load environment variables from project root
+dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
 
 // Import routes (db will auto-initialize when imported)
 import sessionRouter from "./routes/session";
