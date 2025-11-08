@@ -107,7 +107,15 @@ export default function GlobalAIAssistant({ agentId: providedAgentId }: GlobalAI
       conversation.onStatus((newStatus) => {
         console.log('📡 Status:', newStatus);
         setStatus(newStatus);
-        setElevenLabsReady(newStatus === 'connected');
+        
+        // Update elevenLabsReady based on connection status
+        if (newStatus === 'connected') {
+          setElevenLabsReady(true);
+          console.log('✅ ElevenLabs ready - VoiceButton will be hidden');
+        } else if (newStatus === 'disconnected' || newStatus === 'error') {
+          setElevenLabsReady(false);
+          console.log('❌ ElevenLabs not ready - VoiceButton will be shown');
+        }
       });
 
       conversation.onAgentSpeaking((speaking) => {

@@ -192,7 +192,12 @@ export class ElevenLabsConversation {
         case 'ping':
           // Respond to ping
           if (this.ws?.readyState === WebSocket.OPEN) {
-            this.ws.send(JSON.stringify({ type: 'pong', event_id: data.event_id }));
+            const eventId = data.ping_event?.event_id || data.event_id;
+            this.ws.send(JSON.stringify({ 
+              type: 'pong',
+              event_id: eventId,
+            }));
+            console.log('🏓 Pong sent for event:', eventId);
           }
           break;
 
