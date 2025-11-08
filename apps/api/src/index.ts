@@ -8,7 +8,20 @@ import dotenv from "dotenv";
 import path from "path";
 
 // Load environment variables from project root
-dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
+// Try multiple paths to ensure .env is found
+const envPaths = [
+  path.resolve(__dirname, "../../../.env"),
+  path.resolve(process.cwd(), ".env"),
+  path.resolve(__dirname, "../../.env"),
+];
+
+for (const envPath of envPaths) {
+  const result = dotenv.config({ path: envPath });
+  if (!result.error) {
+    console.log(`✅ Loaded .env from: ${envPath}`);
+    break;
+  }
+}
 
 // Import routes (db will auto-initialize when imported)
 import sessionRouter from "./routes/session";
