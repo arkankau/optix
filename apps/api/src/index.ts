@@ -1,27 +1,40 @@
 /**
  * Nearify Exam API Server
+ * 
+ * CRITICAL: Load environment variables FIRST before any imports!
  */
 
-import express from "express";
-import cors from "cors";
 import dotenv from "dotenv";
 import path from "path";
 
-// Load environment variables from project root
-// Try multiple paths to ensure .env is found
+// Load environment variables BEFORE importing anything else
 const envPaths = [
   path.resolve(__dirname, "../../../.env"),
   path.resolve(process.cwd(), ".env"),
   path.resolve(__dirname, "../../.env"),
 ];
 
+let envLoaded = false;
 for (const envPath of envPaths) {
   const result = dotenv.config({ path: envPath });
   if (!result.error) {
     console.log(`✅ Loaded .env from: ${envPath}`);
+    console.log(`🔑 Environment variables loaded:`, {
+      XAI_GROK_API_KEY: process.env.XAI_GROK_API_KEY ? '✅ Present' : '❌ Missing',
+      ELEVENLABS_API_KEY: process.env.ELEVENLABS_API_KEY ? '✅ Present' : '❌ Missing',
+    });
+    envLoaded = true;
     break;
   }
 }
+
+if (!envLoaded) {
+  console.warn('⚠️ No .env file found, tried:', envPaths);
+}
+
+// NOW import everything else AFTER env vars are loaded
+import express from "express";
+import cors from "cors";
 
 // Import routes (db will auto-initialize when imported)
 import sessionRouter from "./routes/session";
