@@ -1,0 +1,48 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>3D Nearify (−2 D)</title>
+    <style>
+      html, body { margin:0; height:100%; background:#0b0b0f; color:#eaeaf2; overflow: hidden; }
+      #root { display:flex; height:100%; }
+      canvas { width:50vw; height:100vh; display:block; background:#000; }
+      #hud {
+        position:fixed; left:12px; bottom:12px; padding:10px 12px;
+        background:#0f172a; border:1px solid #334155; border-radius:10px;
+        font-family: ui-sans-serif, system-ui; font-size:12px; line-height:1.4;
+        color:#e2e8f0; opacity:.95;
+      }
+      #hud div { margin: 2px 0; }
+      #hud b { color: #22c55e; }
+      #controls {
+        position: fixed; top: 12px; left: 12px; padding: 10px 12px;
+        background: #0f172a; border: 1px solid #334155; border-radius: 10px;
+        font-family: ui-sans-serif, system-ui; font-size: 12px;
+        color: #e2e8f0; opacity: .95;
+      }
+      button {
+        padding: 6px 12px; margin: 4px;
+        background: #1e293b; color: #e2e8f0;
+        border: 1px solid #475569; border-radius: 6px;
+        cursor: pointer; font-size: 11px;
+      }
+      button:hover { background: #334155; }
+      button.active { background: #22c55e; color: #000; border-color: #22c55e; }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <canvas id="left"></canvas>
+      <canvas id="right"></canvas>
+      <div id="controls">
+        <div><button id="toggleStereo" class="active">Stereo: ON</button></div>
+        <div><button id="toggleRemap" class="active">Depth Remap: ON</button></div>
+        <div><button id="toggleUI">Toggle UI Plane</button></div>
+      </div>
+      <div id="hud"></div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
+

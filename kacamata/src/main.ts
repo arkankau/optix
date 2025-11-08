@@ -24,18 +24,13 @@ function createMainWindow() {
     icon: path.join(__dirname, '../assets/icon.png'),
   });
 
-  // Check if we're in development (Vite dev server running) or production
-  const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+  // Always load from built files (production mode)
+  // For development with hot reload, use `npm run dev` instead
+  const rendererPath = path.join(__dirname, 'renderer/index.html');
+  console.log('Loading renderer from:', rendererPath);
   
-  if (isDev) {
-    // Try to load from Vite dev server, fallback to file if not available
-    mainWindow.loadURL('http://localhost:5173').catch(() => {
-      mainWindow?.loadFile(path.join(__dirname, 'renderer/index.html'));
-    });
-    mainWindow.webContents.openDevTools();
-  } else {
-    mainWindow.loadFile(path.join(__dirname, 'renderer/index.html'));
-  }
+  mainWindow.loadFile(rendererPath);
+  mainWindow.webContents.openDevTools(); // Keep devtools for debugging
 
   // Log errors for debugging
   mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {

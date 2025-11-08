@@ -17,6 +17,10 @@ interface Props {
   fps: number;
   latency: number;
   distance: number;
+  nearifyMode?: string;
+  nearifyRegion?: string;
+  nearifyDeltaD?: number;
+  nearifyScale?: number;
 }
 
 export function Controls({
@@ -35,6 +39,10 @@ export function Controls({
   fps,
   latency,
   distance,
+  nearifyMode,
+  nearifyRegion,
+  nearifyDeltaD,
+  nearifyScale,
 }: Props) {
   const handleFeedback = (type: 'too_blurry' | 'too_sharp' | 'ok') => {
     onFeedback(type);
@@ -165,6 +173,24 @@ export function Controls({
         <div>
           <strong>Bypass:</strong> {bypass ? 'true' : 'false'}
         </div>
+        {splitMode && nearifyMode && (
+          <>
+            <div style={{ borderLeft: '2px solid #22c55e', paddingLeft: '12px' }}>
+              <strong>Mode:</strong> {nearifyMode}
+            </div>
+            <div>
+              <strong>Region:</strong> {nearifyRegion}
+            </div>
+            <div>
+              <strong>ΔD:</strong> {nearifyDeltaD?.toFixed(2)}D
+            </div>
+            {nearifyScale && nearifyScale > 1.0 && (
+              <div>
+                <strong>Scale:</strong> {nearifyScale.toFixed(2)}×
+              </div>
+            )}
+          </>
+        )}
         {profile && (
           <div>
             <strong>Profile:</strong> {profile.name} ({profile.rx.sphere_D}D)

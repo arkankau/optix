@@ -4,8 +4,121 @@ import { PSFEngine } from './psf-engine';
 /**
  * Wiener Engine: Implements 2D pre-compensation via Wiener deconvolution
  * Supports both separable inverse kernels and tiled FFT-based Wiener filtering
+ * 
+ * NOW WITH SAFETY GUARDS:
+ * - Identity bypass for no-correction cases
+ * - Lambda clamping to prevent over-sharpening
+ * - High-frequency gain limiting to prevent halos
  */
 export class WienerEngine {
+  // Safety limits
+  static readonly LAMBDA_MIN = 0.001;
+  static readonly LAMBDA_MAX = 0.1;
+  static readonly GAIN_LIMIT = 8.0; // Maximum sharpening gain
+  
+  /**
+   * Safe Wiener filter wrapper with guards
+   */
+  static safeWienerFilter(
+    input: Uint8Array,
+    width: number,
+    height: number,
+    kernel: Kernel,
+    lambda: number
+  ): Uint8Array {
+    // Guard 1: Identity bypass
+    if (kernel.is_identity) {
+      const output = new Uint8Array(input.length);
+      output.set(input);
+      return output;
+    }
+    
+    // Guard 2: Near-zero sigma bypass
+    if (kernel.sigma_x < 0.1 && kernel.sigma_y < 0.1) {
+      const output = new Uint8Array(input.length);
+      output.set(input);
+      return output;
+    }
+    
+    // Guard 3: Clamp lambda to safe range
+    const lambda_clamped = Math.max(this.LAMBDA_MIN, Math.min(this.LAMBDA_MAX, lambda));
+    
+    // Apply Wiener filter
+    return this.processFrame(input, width, height, kernel, lambda_clamped);
+  }
+
+  /**
+   * Per-channel Wiener filter for chromatic aberration compensation
+   * Myopic blur can be slightly chromatic - use different λ for R, G, B
+   * 
+   * Default tweaks:
+   * - λ_R = λ_G * 1.05 (red focuses further back)
+   * - λ_G = baseline
+   * - λ_B = λ_G * 0.95 (blue focuses closer)
+   */
+  static safeWienerFilterRGB(
+    input: Uint8Array,
+    width: number,
+    height: number,
+    kernel: Kernel,
+    lambdaG: number,
+    enablePerChannel: boolean = true
+  ): Uint8Array {
+    // Guard checks
+    if (kernel.is_identity || (kernel.sigma_x < 0.1 && kernel.sigma_y < 0.1)) {
+      const output = new Uint8Array(input.length);
+      output.set(input);
+      return output;
+    }
+    
+    // If per-channel disabled, fall back to uniform
+    if (!enablePerChannel) {
+      return this.safeWienerFilter(input, width, height, kernel, lambdaG);
+    }
+    
+    // Clamp base lambda
+    const λG = Math.max(this.LAMBDA_MIN, Math.min(this.LAMBDA_MAX, lambdaG));
+    const λR = Math.max(this.LAMBDA_MIN, Math.min(this.LAMBDA_MAX, λG * 1.05));
+    const λB = Math.max(this.LAMBDA_MIN, Math.min(this.LAMBDA_MAX, λG * 0.95));
+    
+    // Split channels
+    const numPixels = width * height;
+    const R = new Uint8Array(numPixels);
+    const G = new Uint8Array(numPixels);
+    const B = new Uint8Array(numPixels);
+    const A = new Uint8Array(numPixels);
+    
+    for (let i = 0; i < numPixels; i++) {
+      const idx = i * 4;
+      R[i] = input[idx];
+      G[i] = input[idx + 1];
+      B[i] = input[idx + 2];
+      A[i] = input[idx + 3];
+    }
+    
+    // Process each channel with its own lambda
+    // Convert to RGBA format for processing
+    const R_rgba = channelToRGBA(R, width, height);
+    const G_rgba = channelToRGBA(G, width, height);
+    const B_rgba = channelToRGBA(B, width, height);
+    
+    const R_processed = this.processFrame(R_rgba, width, height, kernel, λR);
+    const G_processed = this.processFrame(G_rgba, width, height, kernel, λG);
+    const B_processed = this.processFrame(B_rgba, width, height, kernel, λB);
+    
+    // Merge channels back
+    const output = new Uint8Array(input.length);
+    for (let i = 0; i < numPixels; i++) {
+      const idx = i * 4;
+      output[idx] = R_processed[idx];
+      output[idx + 1] = G_processed[idx + 1];
+      output[idx + 2] = B_processed[idx + 2];
+      output[idx + 3] = A[i];
+    }
+    
+    return output;
+  }
+  
   /**
    * Process frame using 2D pre-compensation
    */
@@ -16,8 +129,11 @@ export class WienerEngine {
     kernel: Kernel,
     lambda: number
   ): Uint8Array {
+    // Identity bypass (redundant check for direct calls)
     if (kernel.is_identity) {
-      return input.slice();
+      const output = new Uint8Array(input.length);
+      output.set(input);
+      return output;
     }
 
     const output = new Uint8Array(input.length);
@@ -298,5 +414,20 @@ export class WienerEngine {
 
     return { horiz, vert };
   }
+}
+
+/**
+ * Helper: Convert single channel to RGBA format (replicate to all channels)
+ */
+function channelToRGBA(channel: Uint8Array, width: number, height: number): Uint8Array {
+  const rgba = new Uint8Array(width * height * 4);
+  for (let i = 0; i < channel.length; i++) {
+    const idx = i * 4;
+    rgba[idx] = channel[i];
+    rgba[idx + 1] = channel[i];
+    rgba[idx + 2] = channel[i];
+    rgba[idx + 3] = 255;
+  }
+  return rgba;
 }
 

@@ -9,7 +9,8 @@
     "dev": "concurrently \"npm run dev:main\" \"npm run dev:renderer\"",
     "dev:main": "tsc --watch",
     "dev:renderer": "vite",
-    "start": "electron .",
+    "start": "cross-env NODE_ENV=production electron .",
+    "start:dev": "electron .",
     "rebuild": "electron-rebuild",
     "package": "electron-builder"
   },
@@ -35,6 +36,7 @@
     "@types/react-dom": "^18.2.18",
     "@vitejs/plugin-react": "^4.2.1",
     "concurrently": "^8.2.2",
+    "cross-env": "^10.1.0",
     "electron": "^28.1.0",
     "electron-builder": "^24.9.1",
     "electron-rebuild": "^3.2.9",
@@ -63,4 +65,3 @@
     }
   }
 }
-

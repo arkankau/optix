@@ -21,9 +21,14 @@ export function LiveView({ profile, isOverlay }: Props) {
     sigmaY: 0,
     lambda: profile?.wiener_lambda ?? 0.008,
     bypass: false,
+    nearifyMode: 'Identity',
+    nearifyRegion: 'inside',
+    nearifyDeltaD: 0,
+    nearifyScale: 1.0,
   });
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const processedCanvasRef = useRef<HTMLCanvasElement>(null);
+  const rawCanvasRef = useRef<HTMLCanvasElement>(null); // For split view left pane
   const animationFrameRef = useRef<number>();
   const lastFrameTime = useRef<number>(0);
   
@@ -138,31 +143,169 @@ export function LiveView({ profile, isOverlay }: Props) {
             console.error('Error drawing video to canvas:', drawError);
           }
 
-          // Always show the original on the left canvas (for split view)
-          // For processed canvas, show either processed or original
-          if (isProcessing && profile) {
-            // Get image data for processing
+          // STEP 2: TRUE SPLIT RENDERING
+          // LEFT pane (canvas) = RAW, always
+          // RIGHT pane (processedCanvas) = Nearify scaled OR raw
+          
+          if (splitMode && isProcessing && profile) {
+            // SPLIT VIEW MODE: Left=RAW, Right=Nearify
+            
+            // A) Capture RAW BEFORE any transforms (already done above)
+            const RAW = canvas;
+            
+            // B) LEFT PANE = RAW (already drawn, no changes needed)
+            
+            // C) Classify myopia with TWO-SIDED logic
+            const sphere_D = profile.rx.sphere_D;
+            const R = Math.abs(sphere_D);
+            const need = 1 / Math.max(0.2, distance / 100);
+            const Amax = 1.5;
+            const lower = R; // far-point boundary
+            const upper = R + Amax; // near accommodation boundary
+            
+            let region: string;
+            let deltaD_val: number;
+            
+            if (need < lower) {
+              // Too far (beyond far point)
+              region = 'too_far';
+              deltaD_val = lower - need;
+            } else if (need > upper) {
+              // Too near (need more accommodation)
+              region = 'too_near';
+              deltaD_val = need - upper;
+            } else {
+              // Inside clear zone
+              region = 'inside';
+              deltaD_val = 0;
+            }
+            
+            // Inside clear zone → show RAW on right too
+            if (region === 'inside') {
+              processedCanvas.width = canvas.width;
+              processedCanvas.height = canvas.height;
+              processedCtx.clearRect(0, 0, processedCanvas.width, processedCanvas.height);
+              processedCtx.drawImage(RAW, 0, 0);
+              
+              // Update debug info
+              setDebugInfo(info => ({
+                ...info,
+                sigmaX: 0,
+                sigmaY: 0,
+                bypass: true,
+                nearifyMode: 'Identity',
+                nearifyRegion: region,
+                nearifyDeltaD: 0,
+                nearifyScale: 1.0,
+              }));
+              return; // Early exit
+            }
+            
+            // Out-of-range guard for flat monitors (ΔD > 3D)
+            if (deltaD_val > 3.0) {
+              processedCanvas.width = canvas.width;
+              processedCanvas.height = canvas.height;
+              processedCtx.clearRect(0, 0, processedCanvas.width, processedCanvas.height);
+              processedCtx.drawImage(RAW, 0, 0);
+              
+              // Add hint message
+              const farPoint_cm = Math.round((1 / R) * 100);
+              processedCtx.fillStyle = 'rgba(255, 87, 34, 0.9)';
+              processedCtx.fillRect(10, 10, 300, 60);
+              processedCtx.fillStyle = '#ffffff';
+              processedCtx.font = 'bold 12px sans-serif';
+              processedCtx.textAlign = 'left';
+              processedCtx.textBaseline = 'top';
+              processedCtx.fillText('Out of range for flat monitor', 20, 20);
+              processedCtx.font = '11px sans-serif';
+              processedCtx.fillText(`Move to ≤${farPoint_cm}cm or use optics`, 20, 40);
+              
+              // Update debug info
+              setDebugInfo(info => ({
+                ...info,
+                sigmaX: 0,
+                sigmaY: 0,
+                bypass: true,
+                nearifyMode: 'Out-of-range',
+                nearifyRegion: region,
+                nearifyDeltaD: deltaD_val,
+                nearifyScale: 1.0,
+              }));
+              return; // Early exit
+            }
+            
+            // NEARIFY: too_far or too_near, within range (ΔD ≤ 3D)
+            {
+            // D) Compute Nearify scale with DEMO FLOOR
+            const distance_inches = distance / 2.54;
+            const PPD = profile.ppi * (Math.PI / 180) * distance_inches;
+            
+            const normalized = Math.min(1, Math.max(0, (deltaD_val - 0.5) / 1.0));
+            const theta = Math.max(10, Math.min(22, 12 + 8 * normalized));
+            
+            const fontPxMin = Math.ceil((theta / 60) * PPD / 0.5);
+            const currentFontPx = 14; // Assumed base font size
+            
+            const S_raw = Math.max(1.0, fontPxMin / Math.max(8, currentFontPx));
+            // DEMO FLOOR: 1.35x minimum so it's always visible
+            const nearifyScale = Math.max(1.35, Math.min(2.0, S_raw));
+            
+            // E) RIGHT PANE = Nearify scaled (pane-local transform ONLY)
+            processedCanvas.width = canvas.width;
+            processedCanvas.height = canvas.height;
+            processedCtx.clearRect(0, 0, processedCanvas.width, processedCanvas.height);
+            
+            // Apply pane-local scaling (NO global CSS)
+            processedCtx.setTransform(nearifyScale, 0, 0, nearifyScale, 0, 0);
+            processedCtx.imageSmoothingEnabled = true;
+            (processedCtx as any).imageSmoothingQuality = 'high';
+            processedCtx.drawImage(RAW, 0, 0);
+            processedCtx.setTransform(1, 0, 0, 1, 0, 0);
+            
+            // F) Add "NEARIFY ON" badge
+            processedCtx.fillStyle = '#22c55e';
+            processedCtx.fillRect(processedCanvas.width - 130, 10, 120, 32);
+            processedCtx.fillStyle = '#ffffff';
+            processedCtx.font = 'bold 14px sans-serif';
+            processedCtx.textAlign = 'center';
+            processedCtx.textBaseline = 'middle';
+            processedCtx.fillText('NEARIFY ON', processedCanvas.width - 70, 26);
+            
+            // Update debug info
+            setDebugInfo(info => ({
+              ...info,
+              sigmaX: 0,
+              sigmaY: 0,
+              bypass: false,
+              nearifyMode: 'Nearify',
+              nearifyRegion: region,
+              nearifyDeltaD: deltaD_val,
+              nearifyScale,
+            }));
+            }
+          } else if (isProcessing && profile) {
+            // SINGLE VIEW MODE (legacy): Call vision engine
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             const buffer = imageData.data.buffer;
 
-            // Process frame
             try {
-            const processed = await window.electronAPI?.vision.processFrame({
-              buffer,
-              width: canvas.width,
-              height: canvas.height,
-              psfParams: {
-                sphere_D: profile.rx.sphere_D,
-                cylinder_D: profile.rx.cylinder_D,
-                distance_cm: distance,
-                display_ppi: profile.ppi,
-                display_width_px: profile.display.width_px,
-                display_height_px: profile.display.height_px,
-                display_diag_in: profile.display.diag_in,
-              },
-              lambda,
-              lfd_inspired: lfdInspired,
-            });
+              const processed = await window.electronAPI?.vision.processFrame({
+                buffer,
+                width: canvas.width,
+                height: canvas.height,
+                psfParams: {
+                  sphere_D: profile.rx.sphere_D,
+                  cylinder_D: profile.rx.cylinder_D,
+                  distance_cm: distance,
+                  display_ppi: profile.ppi,
+                  display_width_px: profile.display.width_px,
+                  display_height_px: profile.display.height_px,
+                  display_diag_in: profile.display.diag_in,
+                },
+                lambda,
+                lfd_inspired: lfdInspired,
+                splitView: false,
+              });
 
               if (processed) {
                 const processedImageData = new ImageData(
@@ -174,20 +317,18 @@ export function LiveView({ profile, isOverlay }: Props) {
                 processedCanvas.height = canvas.height;
                 processedCtx.putImageData(processedImageData, 0, 0);
               } else {
-                // Fallback: copy original
                 processedCanvas.width = canvas.width;
                 processedCanvas.height = canvas.height;
                 processedCtx.drawImage(canvas, 0, 0);
               }
             } catch (processError) {
               console.error('Frame processing error:', processError);
-              // Fallback: copy original
               processedCanvas.width = canvas.width;
               processedCanvas.height = canvas.height;
               processedCtx.drawImage(canvas, 0, 0);
             }
           } else {
-            // Copy original to processed canvas when not processing
+            // Not processing: copy original
             processedCanvas.width = canvas.width;
             processedCanvas.height = canvas.height;
             processedCtx.drawImage(canvas, 0, 0);
@@ -418,6 +559,10 @@ export function LiveView({ profile, isOverlay }: Props) {
         fps={fps}
         latency={latency}
         distance={distance}
+        nearifyMode={debugInfo.nearifyMode}
+        nearifyRegion={debugInfo.nearifyRegion}
+        nearifyDeltaD={debugInfo.nearifyDeltaD}
+        nearifyScale={debugInfo.nearifyScale}
       />
     </div>
   );
