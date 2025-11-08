@@ -54,3 +54,4 @@ export default function OptotypeCanvas({ letters, sizePx, spacing = 1.5 }: Optot
 }
 
 
+

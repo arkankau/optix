@@ -200,3 +200,4 @@ The app automatically parses `[CMD:action:params]` from your responses and trigg
 **This creates a fully AI-driven, voice-first examination experience!** 🎤👁️
 
 
+

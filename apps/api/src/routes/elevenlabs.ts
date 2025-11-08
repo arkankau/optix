@@ -3,20 +3,19 @@ import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js';
 
 const router = Router();
 
-// Get API key - will be available after dotenv.config() in index.ts
-const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
-
 // Lazy initialization - only create client when needed
 let elevenLabsClient: ElevenLabsClient | null = null;
 
 function getElevenLabsClient(): ElevenLabsClient {
-  if (!ELEVENLABS_API_KEY) {
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  
+  if (!apiKey) {
     throw new Error('ElevenLabs API key not configured');
   }
   
   if (!elevenLabsClient) {
     elevenLabsClient = new ElevenLabsClient({
-      apiKey: ELEVENLABS_API_KEY,
+      apiKey: apiKey,
     });
   }
   
@@ -32,7 +31,11 @@ let cachedAgentId: string | null = null;
  */
 router.get('/agent', async (req, res) => {
   try {
-    if (!ELEVENLABS_API_KEY) {
+    console.log('📥 /agent endpoint called');
+    console.log('🔑 API Key present:', !!process.env.ELEVENLABS_API_KEY);
+    
+    if (!process.env.ELEVENLABS_API_KEY) {
+      console.log('❌ No API key found');
       return res.status(500).json({
         error: 'ElevenLabs API key not configured',
       });
@@ -99,7 +102,7 @@ Be conversational, not robotic. Encourage the patient. If they struggle, be supp
  */
 router.post('/signed-url', async (req, res) => {
   try {
-    if (!ELEVENLABS_API_KEY) {
+    if (!process.env.ELEVENLABS_API_KEY) {
       return res.status(500).json({
         error: 'ElevenLabs API key not configured',
       });
