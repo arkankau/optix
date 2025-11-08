@@ -31,11 +31,7 @@ let cachedAgentId: string | null = null;
  */
 router.get('/agent', async (req, res) => {
   try {
-    console.log('📥 /agent endpoint called');
-    console.log('🔑 API Key present:', !!process.env.ELEVENLABS_API_KEY);
-    
     if (!process.env.ELEVENLABS_API_KEY) {
-      console.log('❌ No API key found');
       return res.status(500).json({
         error: 'ElevenLabs API key not configured',
       });
@@ -83,10 +79,12 @@ Be conversational, not robotic. Encourage the patient. If they struggle, be supp
       },
     });
 
-    cachedAgentId = agent.agent_id;
+    // ElevenLabs SDK returns camelCase 'agentId', not snake_case 'agent_id'
+    const agentId = agent.agentId || agent.agent_id || (agent as any).id;
+    cachedAgentId = agentId;
     console.log('✅ Created agent:', cachedAgentId);
 
-    res.json({ agentId: agent.agent_id });
+    res.json({ agentId: cachedAgentId });
   } catch (error: any) {
     console.error('❌ Error creating/getting agent:', error);
     res.status(500).json({
