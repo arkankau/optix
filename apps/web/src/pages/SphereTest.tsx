@@ -42,6 +42,7 @@ export default function SphereTest() {
     showGrok,
     patientTranscriptions,
     currentAnalysis,
+    addPatientTranscription,
     addXAIAnalysis,
   } = useTestStore();
 
