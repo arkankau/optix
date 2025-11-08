@@ -260,66 +260,61 @@ export function useAIAgent() {
       // Pattern matching based on message and current stage
       console.log('🔍 Analyzing message:', msg);
       console.log('🔍 Current stage:', testStore.stage);
+      console.log('🔍 Full message for debugging:', message);
 
       // Starting examination or calibration (only when idle)
       if (testStore.stage === 'idle' && 
-          (msg.includes('starting') || msg.includes('let me calibrate') || msg.includes('calibrate your screen'))) {
+          (msg.includes('starting') || msg.includes('calibrate') || msg.includes('begin'))) {
         console.log('✅ Detected: Starting calibration');
         toolsToCall.push({ name: 'navigate_to_stage', parameters: { stage: 'calibration' } });
       }
       
-      // Calibration complete, moving to testing
-      // ONLY trigger when AI explicitly confirms calibration is done AND wants to move forward
+      // Calibration complete - look for transition language
       if (testStore.stage === 'calibration' && 
-          ((msg.includes('calibration is complete') || 
-            msg.includes('calibration is done') ||
-            msg.includes('calibration looks good') ||
-            msg.includes('perfect, now') ||
-            msg.includes('great, now') ||
-            msg.includes('excellent, now') ||
-            (msg.includes('calibrated') && (msg.includes("let's") || msg.includes('now'))) ||
-            msg.includes('begin testing') || 
-            msg.includes('start testing') ||
-            (msg.includes("let's test") && msg.includes('right'))))) {
-        console.log('✅ Detected: Calibration complete');
+          ((msg.includes('now') && (msg.includes('test') || msg.includes('begin') || msg.includes('start'))) ||
+           msg.includes('move to') ||
+           msg.includes('proceed to') ||
+           (msg.includes('ready') && msg.includes('test')) ||
+           (msg.includes('good') && msg.includes('test')) ||
+           (msg.includes('test') && (msg.includes('right') || msg.includes('first'))))) {
+        console.log('✅ Detected: Calibration complete, moving to testing');
         toolsToCall.push({ name: 'complete_calibration', parameters: {} });
       }
       
-      // Right eye test complete - ONLY when explicitly saying it's done/complete/finished
+      // Right eye test complete - look for moving to next eye
       if (testStore.stage === 'sphere_od' && 
-          ((msg.includes('right eye is complete') || 
-            msg.includes('right eye test is done') ||
-            msg.includes('right eye is done') ||
-            msg.includes('od is complete') ||
-            msg.includes('od test is done') ||
-            msg.includes('finished testing right eye') ||
-            msg.includes('finished with right eye') ||
-            msg.includes('completed right eye') ||
-            (msg.includes('right eye') && msg.includes('finished'))))) {
-        console.log('✅ Detected: Right eye complete');
+          ((msg.includes('now') && (msg.includes('left') || msg.includes('other'))) ||
+           msg.includes('move to left') ||
+           msg.includes('test your left') ||
+           msg.includes('left eye') ||
+           (msg.includes('next') && msg.includes('eye')) ||
+           (msg.includes('good') && msg.includes('left')) ||
+           msg.includes('switch') ||
+           msg.includes('other eye'))) {
+        console.log('✅ Detected: Right eye complete, moving to left');
         toolsToCall.push({ name: 'record_sphere_result', parameters: { eye: 'OD', bestLine: 8 } });
         toolsToCall.push({ name: 'complete_sphere_test', parameters: {} });
       }
       
-      // Left eye test complete - ONLY when explicitly saying it's done/complete/finished
+      // Left eye test complete - look for moving to astigmatism
       if (testStore.stage === 'sphere_os' && 
-          ((msg.includes('left eye is complete') || 
-            msg.includes('left eye test is done') ||
-            msg.includes('left eye is done') ||
-            msg.includes('os is complete') ||
-            msg.includes('os test is done') ||
-            msg.includes('finished testing left eye') ||
-            msg.includes('finished with left eye') ||
-            msg.includes('completed left eye') ||
-            (msg.includes('left eye') && msg.includes('finished'))))) {
-        console.log('✅ Detected: Left eye complete');
+          ((msg.includes('now') && (msg.includes('astigmatism') || msg.includes('next test'))) ||
+           msg.includes('move to astigmatism') ||
+           msg.includes('astigmatism test') ||
+           msg.includes('check astigmatism') ||
+           msg.includes('next phase') ||
+           (msg.includes('both eyes') && msg.includes('done')))) {
+        console.log('✅ Detected: Left eye complete, moving to astigmatism');
         toolsToCall.push({ name: 'record_sphere_result', parameters: { eye: 'OS', bestLine: 8 } });
         toolsToCall.push({ name: 'complete_sphere_test', parameters: {} });
       }
       
       // Astigmatism test complete
       if ((testStore.stage === 'jcc_od' || testStore.stage === 'jcc_os') && 
-          (msg.includes('astigmatism') && (msg.includes('complete') || msg.includes('done') || msg.includes('perfect')))) {
+          ((msg.includes('complete') || msg.includes('done') || msg.includes('finished')) ||
+           msg.includes('show') && msg.includes('result') ||
+           msg.includes('all done') ||
+           msg.includes('examination complete'))) {
         console.log('✅ Detected: Astigmatism complete');
         toolsToCall.push({ name: 'complete_astigmatism_test', parameters: {} });
       }
