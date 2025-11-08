@@ -13,6 +13,27 @@ interface CalibrationData {
   pixelsPerArcmin: number;
 }
 
+interface PatientTranscription {
+  timestamp: number;
+  text: string;
+  eye: Eye;
+  line: number;
+  stage: string;
+}
+
+interface XAIAnalysis {
+  timestamp: number;
+  patientSpeech: string;
+  expectedLetters: string;
+  correct: boolean;
+  confidence: number;
+  suggestedDiopter: number;
+  recommendation: string;
+  reasoning: string;
+  eye: Eye;
+  line: number;
+}
+
 interface TestState {
   // Session
   sessionId: string | null;
@@ -35,6 +56,11 @@ interface TestState {
   isListening: boolean;
   lastTranscript: string;
 
+  // Patient transcriptions and AI analysis
+  patientTranscriptions: PatientTranscription[];
+  xaiAnalyses: XAIAnalysis[];
+  currentAnalysis: XAIAnalysis | null;
+
   // UI state
   showGrokHint: boolean;
   grokMessage: string;
@@ -50,6 +76,9 @@ interface TestState {
   setJccResult: (eye: Eye, result: any) => void;
   setListening: (listening: boolean) => void;
   setTranscript: (text: string) => void;
+  addPatientTranscription: (transcription: PatientTranscription) => void;
+  addXAIAnalysis: (analysis: XAIAnalysis) => void;
+  setCurrentAnalysis: (analysis: XAIAnalysis | null) => void;
   showGrok: (message: string) => void;
   hideGrok: () => void;
   reset: () => void;
@@ -67,6 +96,9 @@ const initialState = {
   jccResults: { OD: null, OS: null },
   isListening: false,
   lastTranscript: '',
+  patientTranscriptions: [] as PatientTranscription[],
+  xaiAnalyses: [] as XAIAnalysis[],
+  currentAnalysis: null as XAIAnalysis | null,
   showGrokHint: false,
   grokMessage: '',
 };
@@ -106,6 +138,19 @@ export const useTestStore = create<TestState>((set) => ({
 
   setListening: (listening) => set({ isListening: listening }),
   setTranscript: (text) => set({ lastTranscript: text }),
+
+  addPatientTranscription: (transcription) =>
+    set((prev) => ({
+      patientTranscriptions: [...prev.patientTranscriptions, transcription],
+    })),
+
+  addXAIAnalysis: (analysis) =>
+    set((prev) => ({
+      xaiAnalyses: [...prev.xaiAnalyses, analysis],
+      currentAnalysis: analysis,
+    })),
+
+  setCurrentAnalysis: (analysis) => set({ currentAnalysis: analysis }),
 
   showGrok: (message) => set({ showGrokHint: true, grokMessage: message }),
   hideGrok: () => set({ showGrokHint: false, grokMessage: '' }),

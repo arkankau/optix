@@ -4,6 +4,8 @@ import { useTestStore } from '../store/testStore';
 import { useAI } from '../contexts/AIContext';
 import FixedLettersChart from '../components/FixedLettersChart';
 import AlertBanner from '../components/AlertBanner';
+import { api } from '../api/client';
+import { formatDiopter } from '../services/xaiAnalyzer';
 
 function getLineLabel(line: number): string {
   const labels: Record<number, string> = {
@@ -36,12 +38,17 @@ export default function SphereTest() {
     grokMessage,
     hideGrok,
     showGrok,
+    patientTranscriptions,
+    currentAnalysis,
+    addXAIAnalysis,
   } = useTestStore();
 
   const [currentLine, setCurrentLine] = useState(1); // Which line of the chart (1-11)
   const [prompt, setPrompt] = useState('');
   const [isComplete, setIsComplete] = useState(false);
   const [widgetReady, setWidgetReady] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [lastAnalyzedTranscript, setLastAnalyzedTranscript] = useState('');
 
   useEffect(() => {
     if (!sessionId || !calibration) {
@@ -53,6 +60,90 @@ export default function SphereTest() {
       initTest();
     }
   }, [sessionId, calibration, currentEye, widgetReady]);
+
+  // Watch for new patient transcriptions and analyze them
+  useEffect(() => {
+    const latestTranscription = patientTranscriptions[patientTranscriptions.length - 1];
+    
+    if (latestTranscription && 
+        latestTranscription.text !== lastAnalyzedTranscript &&
+        latestTranscription.eye === currentEye &&
+        !analyzing) {
+      
+      console.log('🧠 New patient speech detected, analyzing with xAI...');
+      analyzePatientResponse(latestTranscription.text);
+    }
+  }, [patientTranscriptions, currentEye]);
+
+  const analyzePatientResponse = async (patientSpeech: string) => {
+    if (analyzing) return;
+    
+    setAnalyzing(true);
+    setLastAnalyzedTranscript(patientSpeech);
+
+    try {
+      // Get expected letters for current line (simplified - in real app would get from chart)
+      const expectedLetters = getExpectedLettersForLine(currentLine);
+      
+      console.log(`🧠 Analyzing: "${patientSpeech}" vs expected "${expectedLetters}"`);
+
+      const result = await api.analyzeResponse({
+        patientSpeech,
+        expectedLetters,
+        currentLine,
+        eye: currentEye,
+        stage: `sphere_${currentEye.toLowerCase()}`,
+      });
+
+      console.log('✅ xAI Analysis complete:', result);
+
+      // Store the analysis
+      addXAIAnalysis({
+        timestamp: Date.now(),
+        patientSpeech,
+        expectedLetters,
+        correct: result.correct,
+        confidence: result.confidence,
+        suggestedDiopter: result.suggestedDiopter,
+        recommendation: result.recommendation,
+        reasoning: result.reasoning,
+        eye: currentEye,
+        line: currentLine,
+      });
+
+      // Show analysis result to user
+      const emoji = result.correct ? '✅' : '❌';
+      const confidencePercent = (result.confidence * 100).toFixed(0);
+      showGrok(
+        `${emoji} ${result.correct ? 'Correct' : 'Incorrect'} (${confidencePercent}% confidence) - ${result.reasoning}`
+      );
+
+    } catch (error) {
+      console.error('❌ Analysis error:', error);
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  // Get expected letters for a line (simplified version)
+  const getExpectedLettersForLine = (line: number): string => {
+    // In a real implementation, this would come from the actual chart data
+    // For now, return placeholder
+    const letters: Record<number, string> = {
+      1: 'E',
+      2: 'F P',
+      3: 'T O Z',
+      4: 'L P E D',
+      5: 'P E C F D',
+      6: 'E D F C Z P',
+      7: 'F E L O P Z D',
+      8: 'D E F P O T E C',
+      9: 'L E F O D P C T',
+      10: 'F D P L T C E O',
+      11: 'P E Z O L C F T D',
+    };
+    return letters[line] || 'UNKNOWN';
+  };
 
   const initTest = () => {
     const eyeName = currentEye === 'OD' ? 'right' : 'left';
@@ -170,6 +261,64 @@ export default function SphereTest() {
             Current line: <strong>{currentLine}</strong> ({getLineLabel(currentLine)})
           </p>
         </div>
+
+        {/* Patient Transcription Display */}
+        {patientTranscriptions.length > 0 && (
+          <div style={{
+            padding: '1rem',
+            background: 'rgba(16, 185, 129, 0.1)',
+            border: '1px solid rgba(16, 185, 129, 0.3)',
+            borderRadius: '0.5rem',
+            maxWidth: '600px',
+            width: '100%',
+          }}>
+            <p style={{ fontSize: '0.875rem', color: 'var(--color-text)', marginBottom: '0.5rem' }}>
+              <strong>👤 You said:</strong>
+            </p>
+            <p style={{ fontSize: '1rem', color: 'var(--color-text)' }}>
+              "{patientTranscriptions[patientTranscriptions.length - 1].text}"
+            </p>
+            {analyzing && (
+              <p style={{ fontSize: '0.75rem', color: 'var(--color-text-dim)', marginTop: '0.5rem' }}>
+                🧠 Analyzing with xAI...
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* xAI Analysis Result */}
+        {currentAnalysis && currentAnalysis.eye === currentEye && (
+          <div style={{
+            padding: '1rem',
+            background: currentAnalysis.correct ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+            border: `1px solid ${currentAnalysis.correct ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+            borderRadius: '0.5rem',
+            maxWidth: '600px',
+            width: '100%',
+          }}>
+            <p style={{ fontSize: '0.875rem', color: 'var(--color-text)', marginBottom: '0.5rem' }}>
+              <strong>🧠 xAI Analysis:</strong>
+            </p>
+            <div style={{ fontSize: '0.875rem', color: 'var(--color-text)' }}>
+              <p>
+                <strong>{currentAnalysis.correct ? '✅ Correct' : '❌ Incorrect'}</strong>
+                {' '}({(currentAnalysis.confidence * 100).toFixed(0)}% confidence)
+              </p>
+              <p style={{ marginTop: '0.5rem' }}>
+                Expected: <strong>{currentAnalysis.expectedLetters}</strong>
+              </p>
+              <p style={{ marginTop: '0.25rem' }}>
+                Suggested Diopter: <strong>{formatDiopter(currentAnalysis.suggestedDiopter)}</strong>
+              </p>
+              <p style={{ marginTop: '0.25rem' }}>
+                Recommendation: <strong>{currentAnalysis.recommendation}</strong>
+              </p>
+              <p style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: 'var(--color-text-dim)' }}>
+                {currentAnalysis.reasoning}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

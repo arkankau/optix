@@ -185,5 +185,132 @@ router.post('/decide-simple', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/agent/analyze-response
+ * Analyze patient's speech response using xAI Grok
+ */
+router.post('/analyze-response', async (req, res) => {
+  try {
+    const {
+      patientSpeech,
+      expectedLetters,
+      currentLine,
+      eye,
+      stage,
+      previousPerformance = [],
+    } = req.body;
+
+    console.log('\n' + '='.repeat(60));
+    console.log('🧠 PATIENT RESPONSE ANALYSIS');
+    console.log('='.repeat(60));
+    console.log('👤 Patient said:', patientSpeech);
+    console.log('🎯 Expected:', expectedLetters);
+    console.log('📊 Line:', currentLine, '| Eye:', eye, '| Stage:', stage);
+
+    if (!XAI_API_KEY) {
+      console.log('⚠️  No xAI API key, using fallback logic');
+      return res.json({
+        correct: false,
+        confidence: 0.5,
+        suggestedDiopter: 0,
+        recommendation: 'stay',
+        reasoning: 'API key not configured',
+      });
+    }
+
+    // Build analysis prompt for Grok
+    const systemPrompt = `You are an expert optometrist analyzing patient responses during an eye examination.
+
+Your task is to:
+1. Compare what the patient said to what they should have said
+2. Determine if they read the letters correctly (accounting for common mistakes like "O" vs "D", "B" vs "D", etc.)
+3. Assess their performance level
+4. Calculate suggested diopter correction
+5. Recommend whether to advance to smaller lines, stay on current line, or go back to larger lines
+
+Visual Acuity Scale (Snellen):
+- Line 1: 20/200 (largest)
+- Line 2: 20/100
+- Line 3: 20/70
+- Line 4: 20/50
+- Line 5: 20/40
+- Line 6: 20/30
+- Line 7: 20/25
+- Line 8: 20/20 (normal vision, 0D)
+- Line 9: 20/15
+- Line 10: 20/10 (smallest)
+
+Diopter Calculation:
+- Line 8 (20/20) = 0D (no correction)
+- Each line above 8 = approximately +0.25D worse
+- Each line below 8 = better than normal (negative diopter if myopic)
+
+Previous Performance: ${JSON.stringify(previousPerformance)}`;
+
+    const userPrompt = `Patient is testing ${eye} at line ${currentLine}.
+
+Expected letters: "${expectedLetters}"
+Patient said: "${patientSpeech}"
+
+Analyze:
+1. Did they read correctly? (be lenient with common letter confusions)
+2. Confidence level (0-1)
+3. What diopter correction does this suggest?
+4. Should we: "advance" (try smaller line), "stay" (repeat), "go_back" (larger line), or "complete" (finish this eye)?
+
+Respond in JSON format:
+{
+  "correct": boolean,
+  "confidence": number,
+  "suggestedDiopter": number,
+  "recommendation": "advance" | "stay" | "go_back" | "complete",
+  "reasoning": "brief explanation"
+}`;
+
+    const response = await axios.post(
+      XAI_API_URL,
+      {
+        model: 'grok-beta',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature: 0.2,
+        response_format: { type: 'json_object' },
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${XAI_API_KEY}`,
+        },
+      }
+    );
+
+    const analysis = JSON.parse(response.data.choices[0].message.content);
+
+    console.log('✅ ANALYSIS RESULT:');
+    console.log('  Correct:', analysis.correct, `(${(analysis.confidence * 100).toFixed(0)}% confidence)`);
+    console.log('  Diopter:', analysis.suggestedDiopter);
+    console.log('  Recommendation:', analysis.recommendation);
+    console.log('  Reasoning:', analysis.reasoning);
+    console.log('='.repeat(60) + '\n');
+
+    res.json(analysis);
+  } catch (error: any) {
+    console.error('\n' + '❌ ANALYSIS ERROR:');
+    console.error('Error:', error.response?.data || error.message);
+    console.error('='.repeat(60) + '\n');
+
+    // Fallback analysis
+    res.json({
+      correct: false,
+      confidence: 0,
+      suggestedDiopter: 0,
+      recommendation: 'stay',
+      reasoning: 'Analysis failed: ' + error.message,
+    });
+  }
+});
+
 export default router;
 

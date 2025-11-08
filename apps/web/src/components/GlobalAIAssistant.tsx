@@ -47,8 +47,22 @@ export default function GlobalAIAssistant({ agentId }: GlobalAIAssistantProps) {
     console.log(`🎤 ${isUser ? 'Patient' : 'AI Examiner'}: ${message}`);
     setMessageLog(prev => [...prev, `${isUser ? 'Patient' : 'AI'}: ${message}`].slice(-10));
 
-    if (!isUser) {
-      // AI is speaking - let the agent process and take action
+    if (isUser) {
+      // Patient is speaking - store transcription and trigger xAI analysis
+      console.log('👤 Patient speech detected, storing transcription');
+      
+      // Store the patient transcription
+      useTestStore.getState().addPatientTranscription({
+        timestamp: Date.now(),
+        text: message,
+        eye: currentEye,
+        line: 0, // Will be set by the test page
+        stage,
+      });
+
+      // The test page components will handle xAI analysis when appropriate
+    } else {
+      // AI Examiner is speaking - let the agent process and take action
       await processAIMessage(message, isUser);
     }
   };

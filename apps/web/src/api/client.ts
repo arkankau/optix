@@ -186,6 +186,21 @@ class APIClient {
       body: JSON.stringify({ sessionId, eye }),
     });
   }
+
+  // Agent - xAI Analysis
+  async analyzeResponse(data: {
+    patientSpeech: string;
+    expectedLetters: string;
+    currentLine: number;
+    eye: string;
+    stage: string;
+    previousPerformance?: Array<{ line: number; correct: boolean }>;
+  }) {
+    return this.request<any>('/api/agent/analyze-response', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
 }
 
 export const api = new APIClient(API_BASE);
