@@ -219,47 +219,68 @@ export class ElevenLabsConversation {
   }
 
   /**
-   * Start capturing user audio
+   * Start capturing user audio using Web Speech API
+   * Much simpler and more reliable than WebSocket audio streaming
    */
   async startListening() {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          sampleRate: 16000,
-          channelCount: 1,
-          echoCancellation: true,
-          noiseSuppression: true,
-        }
-      });
+      // @ts-ignore - Web Speech API
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       
-      // Use MediaRecorder with supported format
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') 
-        ? 'audio/webm;codecs=opus' 
-        : 'audio/webm';
-        
-      this.mediaRecorder = new MediaRecorder(stream, { mimeType });
+      if (!SpeechRecognition) {
+        console.error('❌ Web Speech API not supported in this browser');
+        return;
+      }
 
-      this.mediaRecorder.ondataavailable = async (event) => {
-        if (event.data.size > 0 && this.ws?.readyState === WebSocket.OPEN) {
-          // Send binary audio data directly
-          const arrayBuffer = await event.data.arrayBuffer();
-          const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-          
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+
+      recognition.onresult = (event: any) => {
+        const last = event.results.length - 1;
+        const transcript = event.results[last][0].transcript;
+        const confidence = event.results[last][0].confidence;
+        
+        console.log(`🎤 User said: "${transcript}" (${(confidence * 100).toFixed(0)}% confidence)`);
+        
+        // Send transcript to ElevenLabs
+        if (this.ws?.readyState === WebSocket.OPEN) {
           this.ws.send(JSON.stringify({
-            type: 'user_audio_chunk',
-            chunk: {
-              audio_base_64: base64,
-            },
+            type: 'user_transcript',
+            user_transcript: transcript,
           }));
-          
-          console.log(`🎙️ Sent audio chunk: ${event.data.size} bytes`);
+          console.log('📤 Sent transcript to agent');
+        }
+        
+        // Trigger callback for UI
+        this.onMessageCallback?.({
+          id: Date.now().toString(),
+          type: 'user',
+          text: transcript,
+          timestamp: Date.now(),
+        });
+      };
+
+      recognition.onerror = (event: any) => {
+        if (event.error !== 'no-speech') {
+          console.error('❌ Speech recognition error:', event.error);
         }
       };
 
-      this.mediaRecorder.start(100); // Send chunks every 100ms
-      console.log('🎤 Started listening');
+      recognition.onend = () => {
+        console.log('🎤 Speech recognition ended, restarting...');
+        if (this.ws?.readyState === WebSocket.OPEN) {
+          // Auto-restart to keep listening
+          setTimeout(() => recognition.start(), 100);
+        }
+      };
+
+      recognition.start();
+      this.mediaRecorder = recognition as any; // Store for stopping later
+      console.log('🎤 Started listening with Web Speech API');
     } catch (error) {
-      console.error('❌ Error starting microphone:', error);
+      console.error('❌ Error starting speech recognition:', error);
       throw error;
     }
   }
@@ -268,10 +289,13 @@ export class ElevenLabsConversation {
    * Stop capturing user audio
    */
   stopListening() {
-    if (this.mediaRecorder?.state === 'recording') {
-      this.mediaRecorder.stop();
-      this.mediaRecorder.stream.getTracks().forEach(track => track.stop());
-      console.log('🎤 Stopped listening');
+    if (this.mediaRecorder) {
+      try {
+        (this.mediaRecorder as any).stop();
+        console.log('🎤 Stopped listening');
+      } catch (e) {
+        // Already stopped, ignore
+      }
     }
   }
 
