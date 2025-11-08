@@ -28,28 +28,17 @@ export default function GlobalAIAssistant({ agentId }: GlobalAIAssistantProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAIActive]); // Only run when AI activation state changes
 
-  // Monitor stage changes and trigger agent on state changes
+  // Monitor stage changes (logging only - no auto-trigger)
   useEffect(() => {
     if (lastStage !== stage && isAIActive) {
       console.log(`📊 Stage changed: ${lastStage} → ${stage}`);
       setLastStage(stage);
       
-      // Trigger agent based on stage change
-      const stageMessages: Record<string, string> = {
-        'calibration': 'Starting calibration process',
-        'sphere_od': 'Calibration complete. Testing right eye.',
-        'sphere_os': 'Right eye complete. Testing left eye.',
-        'jcc_od': 'Both eyes tested. Starting astigmatism test.',
-        'summary': 'Examination complete. Showing results.',
-      };
-      
-      const message = stageMessages[stage];
-      if (message) {
-        console.log(`🔄 Auto-trigger: ${message}`);
-        setTimeout(() => processAIMessage(message, false), 500);
-      }
+      // NOTE: Auto-trigger disabled - progression now happens ONLY through voice interactions
+      // The AI examiner in ElevenLabs will guide the patient and trigger stage changes
+      // via voice commands that get processed through handleMessage
     }
-  }, [stage, lastStage, isAIActive, processAIMessage]);
+  }, [stage, lastStage, isAIActive]);
 
   // REMOVED: Auto-trigger was just for debugging
   // Real progression happens when ElevenLabs AI sends completion messages
