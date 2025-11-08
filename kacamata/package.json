@@ -1,0 +1,66 @@
+{
+  "name": "clarity",
+  "version": "0.1.0-mvp",
+  "description": "Software-Defined Glasses - Desktop app for vision correction without physical glasses",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc && npm run build:renderer",
+    "build:renderer": "vite build",
+    "dev": "concurrently \"npm run dev:main\" \"npm run dev:renderer\"",
+    "dev:main": "tsc --watch",
+    "dev:renderer": "vite",
+    "start": "electron .",
+    "rebuild": "electron-rebuild",
+    "package": "electron-builder"
+  },
+  "keywords": [
+    "vision",
+    "accessibility",
+    "glasses",
+    "myopia",
+    "astigmatism"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@mediapipe/camera_utils": "^0.3.1640029074",
+    "@mediapipe/face_mesh": "^0.4.1633559619",
+    "@tensorflow/tfjs": "^4.15.0",
+    "@tensorflow/tfjs-core": "^4.15.0",
+    "electron-updater": "^6.1.7"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.6",
+    "@types/react": "^18.2.45",
+    "@types/react-dom": "^18.2.18",
+    "@vitejs/plugin-react": "^4.2.1",
+    "concurrently": "^8.2.2",
+    "electron": "^28.1.0",
+    "electron-builder": "^24.9.1",
+    "electron-rebuild": "^3.2.9",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.8"
+  },
+  "build": {
+    "appId": "com.clarity.app",
+    "productName": "Clarity",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "node_modules/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/icon.icns"
+    }
+  }
+}
+
