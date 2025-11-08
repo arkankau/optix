@@ -136,10 +136,15 @@ export default function SphereTest() {
     setLastAnalyzedTranscript(patientSpeech);
 
     try {
-      // Get expected letters for current line (simplified - in real app would get from chart)
+      // Get expected letters for current line
       const expectedLetters = getExpectedLettersForLine(currentLine);
       
       console.log(`🧠 Analyzing: "${patientSpeech}" vs expected "${expectedLetters}"`);
+
+      // Build previous performance history for this eye
+      const previousPerformance = xaiAnalyses
+        .filter(a => a.eye === currentEye)
+        .map(a => ({ line: a.line, correct: a.correct }));
 
       const result = await api.analyzeResponse({
         patientSpeech,
@@ -147,6 +152,7 @@ export default function SphereTest() {
         currentLine,
         eye: currentEye,
         stage: `sphere_${currentEye.toLowerCase()}`,
+        previousPerformance,
       });
 
       console.log('✅ xAI Analysis complete:', result);
@@ -251,11 +257,12 @@ export default function SphereTest() {
     // Called when sphere test completes for this eye
     setIsComplete(true);
     
-    // Calculate rough sphere from best line read
-    const sphereValue = lineToSphere(currentLine);
+    // Get best line from xAI analysis or use previous line (since current line likely failed)
+    const bestLine = currentAnalysis?.correct ? currentLine : Math.max(1, currentLine - 1);
+    const sphereValue = lineToSphere(bestLine);
     
     const result = {
-      threshold: lineToLogMAR(currentLine),
+      threshold: lineToLogMAR(bestLine),
       sphere: sphereValue,
       confidence: 0.85,
     };
@@ -263,7 +270,7 @@ export default function SphereTest() {
     setSphereResult(currentEye, result);
 
     console.log(`✅ Sphere test complete for ${currentEye}:`, result);
-    console.log(`   Line: ${currentLine}, Sphere: ${sphereValue}D, LogMAR: ${lineToLogMAR(currentLine)}`);
+    console.log(`   Best Line: ${bestLine}, Current Line: ${currentLine}, Sphere: ${sphereValue}D`);
 
     // Move to next eye or astigmatism test
     if (currentEye === 'OD') {
