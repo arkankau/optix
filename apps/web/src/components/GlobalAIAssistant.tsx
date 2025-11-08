@@ -11,10 +11,11 @@ interface GlobalAIAssistantProps {
 export default function GlobalAIAssistant({ agentId }: GlobalAIAssistantProps) {
   const { isAIActive } = useAI();
   const { stage, currentEye, calibration, sessionId } = useTestStore();
-  const { startAgent, processAIMessage, agentThinking } = useAIAgent();
+  const { startAgent, processAIMessage, agentThinking, executeManualAction, lastMessage } = useAIAgent();
   const [isReady, setIsReady] = useState(false);
   const [lastStage, setLastStage] = useState(stage);
   const [messageLog, setMessageLog] = useState<string[]>([]);
+  const [showManualControls, setShowManualControls] = useState(true);
 
   // Start AI agent when AI is activated (don't wait for widget)
   useEffect(() => {
@@ -146,6 +147,105 @@ export default function GlobalAIAssistant({ agentId }: GlobalAIAssistantProps) {
             animation: 'spin 1s linear infinite',
           }} />
           AI Agent Thinking...
+        </div>
+      )}
+
+      {/* Manual Controls for Debugging */}
+      {isAIActive && showManualControls && (
+        <div style={{
+          position: 'fixed',
+          bottom: '100px',
+          right: '20px',
+          zIndex: 9998,
+          background: 'rgba(0, 0, 0, 0.9)',
+          padding: '1rem',
+          borderRadius: '0.5rem',
+          border: '2px solid rgba(245, 158, 11, 0.5)',
+          maxWidth: '300px',
+        }}>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '0.75rem',
+          }}>
+            <h4 style={{ color: 'white', fontSize: '0.875rem', margin: 0 }}>
+              🎮 Manual Controls
+            </h4>
+            <button
+              onClick={() => setShowManualControls(false)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'white',
+                cursor: 'pointer',
+                fontSize: '1.25rem',
+              }}
+            >
+              ×
+            </button>
+          </div>
+
+          <div style={{ fontSize: '0.75rem', color: '#aaa', marginBottom: '0.5rem' }}>
+            Stage: <strong style={{ color: 'white' }}>{stage}</strong>
+          </div>
+
+          <div style={{ fontSize: '0.75rem', color: '#aaa', marginBottom: '0.75rem', maxHeight: '60px', overflow: 'auto' }}>
+            Last: {lastMessage.substring(0, 80)}...
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            {stage === 'calibration' && (
+              <button
+                onClick={() => executeManualAction('complete_calibration')}
+                style={{
+                  padding: '0.5rem',
+                  background: 'rgba(34, 197, 94, 0.2)',
+                  border: '1px solid rgba(34, 197, 94, 0.5)',
+                  color: 'white',
+                  borderRadius: '0.25rem',
+                  cursor: 'pointer',
+                  fontSize: '0.75rem',
+                }}
+              >
+                ✅ Complete Calibration
+              </button>
+            )}
+
+            {(stage === 'sphere_od' || stage === 'sphere_os') && (
+              <button
+                onClick={() => executeManualAction('complete_sphere')}
+                style={{
+                  padding: '0.5rem',
+                  background: 'rgba(34, 197, 94, 0.2)',
+                  border: '1px solid rgba(34, 197, 94, 0.5)',
+                  color: 'white',
+                  borderRadius: '0.25rem',
+                  cursor: 'pointer',
+                  fontSize: '0.75rem',
+                }}
+              >
+                ✅ Complete {currentEye} Sphere Test
+              </button>
+            )}
+
+            {(stage === 'jcc_od' || stage === 'jcc_os') && (
+              <button
+                onClick={() => executeManualAction('complete_astigmatism')}
+                style={{
+                  padding: '0.5rem',
+                  background: 'rgba(34, 197, 94, 0.2)',
+                  border: '1px solid rgba(34, 197, 94, 0.5)',
+                  color: 'white',
+                  borderRadius: '0.25rem',
+                  cursor: 'pointer',
+                  fontSize: '0.75rem',
+                }}
+              >
+                ✅ Complete Astigmatism Test
+              </button>
+            )}
+          </div>
         </div>
       )}
 

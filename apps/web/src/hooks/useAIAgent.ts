@@ -19,6 +19,7 @@ export function useAIAgent() {
   const testStore = useTestStore();
   const [isAgentActive, setIsAgentActive] = useState(false);
   const [agentThinking, setAgentThinking] = useState(false);
+  const [lastMessage, setLastMessage] = useState('');
 
   // Define available tools the AI agent can use
   // Memoized to prevent recreating on every render
@@ -231,10 +232,46 @@ export function useAIAgent() {
   ], [navigate, testStore]); // Memoize with stable dependencies
 
   /**
+   * Manual tool execution (for debugging/testing)
+   */
+  const executeManualAction = useCallback(async (action: string) => {
+    console.log('🎮 Manual action triggered:', action);
+    
+    const actionMap: Record<string, () => Promise<void>> = {
+      'complete_calibration': async () => {
+        const tool = tools.find(t => t.name === 'complete_calibration');
+        if (tool) await tool.execute({});
+      },
+      'complete_sphere': async () => {
+        const tool = tools.find(t => t.name === 'complete_sphere_test');
+        if (tool) await tool.execute({});
+      },
+      'complete_astigmatism': async () => {
+        const tool = tools.find(t => t.name === 'complete_astigmatism_test');
+        if (tool) await tool.execute({});
+      },
+    };
+
+    const action_fn = actionMap[action];
+    if (action_fn) {
+      await action_fn();
+    }
+  }, [tools]);
+
+  /**
    * Process AI message and execute any tool calls
    */
   const processAIMessage = useCallback(async (message: string, isUser: boolean) => {
-    console.log('🔍 processAIMessage called:', { message: message.substring(0, 50) + '...', isUser, isAgentActive });
+    setLastMessage(message);
+    console.log('\n' + '='.repeat(80));
+    console.log('🔍 processAIMessage called');
+    console.log('='.repeat(80));
+    console.log('📝 Message:', message);
+    console.log('👤 Is User:', isUser);
+    console.log('🤖 Agent Active:', isAgentActive);
+    console.log('📊 Stage:', testStore.stage);
+    console.log('👁️  Eye:', testStore.currentEye);
+    console.log('='.repeat(80) + '\n');
     
     if (isUser) {
       console.log('⏭️  Skipping: User message');
@@ -242,12 +279,9 @@ export function useAIAgent() {
     }
     
     if (!isAgentActive) {
-      console.log('⏭️  Skipping: Agent not active');
+      console.log('⚠️  Agent not active - call startAgent() first');
       return;
     }
-
-    console.log('🤖 AI Agent processing message:', message);
-    console.log('📊 Current state:', { stage: testStore.stage, eye: testStore.currentEye });
 
     // Simple pattern matching (fallback for now, will use Grok later)
     try {
@@ -260,7 +294,6 @@ export function useAIAgent() {
       // Pattern matching based on message and current stage
       console.log('🔍 Analyzing message:', msg);
       console.log('🔍 Current stage:', testStore.stage);
-      console.log('🔍 Full message for debugging:', message);
 
       // Starting examination or calibration (only when idle)
       if (testStore.stage === 'idle' && 
@@ -383,6 +416,8 @@ export function useAIAgent() {
     startAgent,
     stopAgent,
     processAIMessage,
+    executeManualAction,
+    lastMessage,
     tools,
   };
 }
