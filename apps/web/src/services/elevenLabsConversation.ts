@@ -16,6 +16,7 @@ export class ElevenLabsConversation {
   private audioContext: AudioContext | null = null;
   private audioQueue: AudioBuffer[] = [];
   private isPlaying = false;
+  private keepAliveInterval: number | null = null;
 
   // Callbacks
   private onMessageCallback?: (message: ConversationMessage) => void;
@@ -54,6 +55,17 @@ export class ElevenLabsConversation {
         console.log('✅ WebSocket connected');
         this.onStatusCallback?.('connected');
         
+        // Start keepalive ping every 30 seconds
+        this.keepAliveInterval = window.setInterval(() => {
+          if (this.ws?.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify({ 
+              type: 'ping',
+              event_id: Date.now()
+            }));
+            console.log('💓 Keepalive ping sent');
+          }
+        }, 30000);
+        
         // Automatically start listening after connection
         await this.startListening();
       };
@@ -69,6 +81,13 @@ export class ElevenLabsConversation {
 
       this.ws.onclose = () => {
         console.log('🔌 WebSocket disconnected');
+        
+        // Clear keepalive interval
+        if (this.keepAliveInterval) {
+          clearInterval(this.keepAliveInterval);
+          this.keepAliveInterval = null;
+        }
+        
         this.onStatusCallback?.('disconnected');
       };
 
@@ -111,8 +130,7 @@ export class ElevenLabsConversation {
       switch (data.type) {
         case 'conversation_initiation_metadata':
           console.log('🎤 Agent ready to speak');
-          // Send initial greeting trigger
-          this.sendMessage('Hello, I\'m ready to start the eye examination.');
+          // Agent will greet automatically, no need to send initial message
           break;
 
         case 'audio':
@@ -243,26 +261,26 @@ export class ElevenLabsConversation {
 
   /**
    * Play agent audio response from base64
+   * Uses HTML5 Audio for better format support (MP3, etc.)
    */
   private async playAgentAudioBase64(base64Audio: string) {
     try {
-      if (!this.audioContext) return;
-
-      // Decode base64 to ArrayBuffer
-      const binaryString = atob(base64Audio);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-
-      // Decode audio data
-      const audioBuffer = await this.audioContext.decodeAudioData(bytes.buffer);
+      // ElevenLabs sends MP3 audio - use HTML5 Audio element
+      const audio = new Audio(`data:audio/mp3;base64,${base64Audio}`);
+      audio.volume = 1.0;
       
-      // Add to queue and play
-      this.audioQueue.push(audioBuffer);
-      if (!this.isPlaying) {
-        this.playNextInQueue();
-      }
+      audio.onended = () => {
+        console.log('🔊 Audio playback complete');
+        this.onAgentSpeakingCallback?.(false);
+      };
+      
+      audio.onerror = (e) => {
+        console.error('❌ Audio playback error:', e);
+        this.onAgentSpeakingCallback?.(false);
+      };
+      
+      await audio.play();
+      console.log('🔊 Playing agent audio');
     } catch (error) {
       console.error('❌ Error playing audio:', error);
     }
@@ -330,6 +348,13 @@ export class ElevenLabsConversation {
    */
   disconnect() {
     this.stopListening();
+    
+    // Clear keepalive interval
+    if (this.keepAliveInterval) {
+      clearInterval(this.keepAliveInterval);
+      this.keepAliveInterval = null;
+    }
+    
     this.ws?.close();
     this.audioContext?.close();
     this.ws = null;
