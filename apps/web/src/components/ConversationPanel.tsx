@@ -102,30 +102,23 @@ export default function ConversationPanel({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          background: status === 'connected' 
-            ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(59, 130, 246, 0.1))' 
-            : 'rgba(239, 68, 68, 0.1)',
+          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(59, 130, 246, 0.1))',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <div style={{
               width: '10px',
               height: '10px',
               borderRadius: '50%',
-              background: status === 'connected' ? '#10b981' : '#ef4444',
-              boxShadow: status === 'connected' 
-                ? '0 0 12px rgba(16, 185, 129, 0.8)' 
-                : '0 0 12px rgba(239, 68, 68, 0.8)',
-              animation: status === 'connected' ? 'pulse 2s infinite' : 'none',
+              background: '#10b981',
+              boxShadow: '0 0 12px rgba(16, 185, 129, 0.8)',
+              animation: 'pulse 2s infinite',
             }} />
             <div>
               <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'white' }}>
                 AI Assistant
               </div>
               <div style={{ fontSize: '0.75rem', color: '#9ca3af' }}>
-                {status === 'connecting' && 'Connecting...'}
-                {status === 'connected' && (isAgentSpeaking ? 'Speaking...' : 'Listening...')}
-                {status === 'disconnected' && 'Disconnected'}
-                {status === 'error' && 'Connection Error'}
+                {isAgentSpeaking ? 'Speaking...' : isListening ? 'Listening...' : 'Ready'}
               </div>
             </div>
           </div>
@@ -230,7 +223,7 @@ export default function ConversationPanel({
             }}>
               <button
                 onClick={isListening ? onStopListening : onStartListening}
-                disabled={status !== 'connected'}
+                disabled={false}
                 style={{
                   flex: 1,
                   padding: '0.875rem 1.5rem',
@@ -242,8 +235,8 @@ export default function ConversationPanel({
                   color: 'white',
                   fontSize: '0.875rem',
                   fontWeight: 600,
-                  cursor: status === 'connected' ? 'pointer' : 'not-allowed',
-                  opacity: status === 'connected' ? 1 : 0.5,
+                  cursor: 'pointer',
+                  opacity: 1,
                   boxShadow: isListening 
                     ? '0 0 20px rgba(239, 68, 68, 0.5)' 
                     : '0 4px 12px rgba(59, 130, 246, 0.3)',
