@@ -1,5 +1,6 @@
 import { Kernel } from '../types';
 import { PSFEngine } from './psf-engine';
+import { compute1DFFT, compute1DIFFT, computeWienerFilter1D } from './fft-utils';
 
 /**
  * Wiener Engine: Implements 2D pre-compensation via Wiener deconvolution
@@ -14,7 +15,8 @@ export class WienerEngine {
     width: number,
     height: number,
     kernel: Kernel,
-    lambda: number
+    lambda: number,
+    contrastBoost?: number
   ): Uint8Array {
     if (kernel.is_identity) {
       return input.slice();
@@ -24,10 +26,10 @@ export class WienerEngine {
 
     if (kernel.separable && kernel.inv_horiz && kernel.inv_vert) {
       // Fast separable path
-      return this.processSeparable(input, width, height, kernel, lambda);
+      return this.processSeparable(input, width, height, kernel, lambda, contrastBoost);
     } else {
       // Tiled FFT Wiener (fallback to unsharp masking for MVP)
-      return this.processUnsharpMasking(input, width, height, kernel, lambda);
+      return this.processUnsharpMasking(input, width, height, kernel, lambda, contrastBoost);
     }
   }
 
@@ -39,7 +41,8 @@ export class WienerEngine {
     width: number,
     height: number,
     kernel: Kernel,
-    lambda: number
+    lambda: number,
+    contrastBoost?: number
   ): Uint8Array {
     const output = new Uint8Array(input.length);
     const inv_h = kernel.inv_horiz!;
@@ -50,7 +53,7 @@ export class WienerEngine {
     const center_v = Math.floor(ksize_v / 2);
 
     // Horizontal pass
-    const temp = new Uint8Array(input.length);
+    const temp = new Float32Array(input.length);
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         let r = 0, g = 0, b = 0, a = 0;
@@ -64,9 +67,10 @@ export class WienerEngine {
           a += input[idx + 3] * weight;
         }
         const out_idx = (y * width + x) * 4;
-        temp[out_idx] = Math.min(255, Math.max(0, r));
-        temp[out_idx + 1] = Math.min(255, Math.max(0, g));
-        temp[out_idx + 2] = Math.min(255, Math.max(0, b));
+        // Use Float32Array to preserve precision, clamp later
+        temp[out_idx] = r;
+        temp[out_idx + 1] = g;
+        temp[out_idx + 2] = b;
         temp[out_idx + 3] = a;
       }
     }
@@ -85,15 +89,16 @@ export class WienerEngine {
           a += temp[idx + 3] * weight;
         }
         const out_idx = (y * width + x) * 4;
-        output[out_idx] = Math.min(255, Math.max(0, r));
-        output[out_idx + 1] = Math.min(255, Math.max(0, g));
-        output[out_idx + 2] = Math.min(255, Math.max(0, b));
-        output[out_idx + 3] = a;
+        // Clamp to valid range with proper rounding
+        output[out_idx] = Math.min(255, Math.max(0, Math.round(r)));
+        output[out_idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+        output[out_idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+        output[out_idx + 3] = Math.min(255, Math.max(0, Math.round(a)));
       }
     }
 
     // Post-processing: mid-frequency boost and halo limiter
-    return this.postProcess(output, width, height, lambda);
+    return this.postProcess(output, width, height, lambda, contrastBoost);
   }
 
   /**
@@ -104,7 +109,8 @@ export class WienerEngine {
     width: number,
     height: number,
     kernel: Kernel,
-    lambda: number
+    lambda: number,
+    contrastBoost?: number
   ): Uint8Array {
     const output = new Uint8Array(input.length);
     const kernel_data = PSFEngine.generateGaussianKernel(kernel);
@@ -141,7 +147,7 @@ export class WienerEngine {
       output[i + 3] = origA;
     }
 
-    return this.postProcess(output, width, height, lambda);
+    return this.postProcess(output, width, height, lambda, contrastBoost);
   }
 
   /**
@@ -208,18 +214,23 @@ export class WienerEngine {
   }
 
   /**
-   * Post-processing: mid-frequency boost and halo limiter
+   * Post-processing: gentle tone mapping and halo limiter
+   * Reduced contrast boost to prevent over-amplification
    */
   private static postProcess(
     input: Uint8Array,
     width: number,
     height: number,
-    lambda: number
+    lambda: number,
+    userContrastBoost?: number
   ): Uint8Array {
     const output = new Uint8Array(input.length);
 
-    // Mid-frequency contrast boost (MTF compensation)
-    const contrastBoost = 1.15 + lambda * 10;
+    // Use user-provided contrast boost, or fallback to minimal auto-boost
+    // User can control this via slider (0.8 to 1.3)
+    const contrastBoost = userContrastBoost !== undefined 
+      ? userContrastBoost 
+      : (1.0 + Math.min(0.1, lambda * 2)); // Max 1.1x boost if not specified
 
     for (let i = 0; i < input.length; i += 4) {
       const r = input[i];
@@ -227,7 +238,7 @@ export class WienerEngine {
       const b = input[i + 2];
       const a = input[i + 3];
 
-      // Contrast boost around midpoint
+      // Gentle contrast boost around midpoint
       let boostedR = (r - 128) * contrastBoost + 128;
       let boostedG = (g - 128) * contrastBoost + 128;
       let boostedB = (b - 128) * contrastBoost + 128;
@@ -247,53 +258,92 @@ export class WienerEngine {
   }
 
   /**
-   * Generate separable inverse kernels for fast convolution
-   * Approximates Wiener inverse filter as separable 1D kernels
+   * Generate separable inverse kernels using proper Wiener filter formula
+   * Computes Wiener filter in frequency domain: W(f) = H*(f) / (|H(f)|² + λ)
+   * Then converts back to spatial domain via IFFT
    */
   static generateSeparableInverse(kernel: Kernel, lambda: number): { horiz: Float32Array; vert: Float32Array } {
+    // Ensure lambda is in reasonable range
+    lambda = Math.max(0.001, Math.min(0.1, lambda));
+    
     const size = kernel.size;
     const center = Math.floor(size / 2);
     const sigma_x = kernel.sigma_x;
     const sigma_y = kernel.sigma_y;
 
-    // Generate 1D Gaussian kernels
-    const horiz = new Float32Array(size);
-    const vert = new Float32Array(size);
+    // Generate 1D Gaussian kernels (spatial domain)
+    const h_horiz = new Float32Array(size);
+    const h_vert = new Float32Array(size);
     let sum_h = 0, sum_v = 0;
 
     for (let i = 0; i < size; i++) {
       const dx = i - center;
-      horiz[i] = Math.exp(-0.5 * (dx * dx) / (sigma_x * sigma_x));
-      vert[i] = Math.exp(-0.5 * (dx * dx) / (sigma_y * sigma_y));
-      sum_h += horiz[i];
-      sum_v += vert[i];
+      h_horiz[i] = Math.exp(-0.5 * (dx * dx) / (sigma_x * sigma_x));
+      h_vert[i] = Math.exp(-0.5 * (dx * dx) / (sigma_y * sigma_y));
+      sum_h += h_horiz[i];
+      sum_v += h_vert[i];
     }
 
-    // Normalize
+    // Normalize kernels
     for (let i = 0; i < size; i++) {
-      horiz[i] /= sum_h;
-      vert[i] /= sum_v;
+      h_horiz[i] /= sum_h;
+      h_vert[i] /= sum_v;
     }
 
-    // Approximate inverse: use high-pass + regularization
-    // Simplified: inverse ≈ (1 - blur) / (1 + lambda)
+    // Compute 1D FFT of Gaussian kernels
+    const h_horiz_fft = compute1DFFT(h_horiz);
+    const h_vert_fft = compute1DFFT(h_vert);
+
+    // Compute Wiener filter in frequency domain: W(f) = H*(f) / (|H(f)|² + λ)
+    const w_horiz_fft = computeWienerFilter1D(h_horiz_fft.real, h_horiz_fft.imag, lambda);
+    const w_vert_fft = computeWienerFilter1D(h_vert_fft.real, h_vert_fft.imag, lambda);
+
+    // Convert Wiener filter back to spatial domain via IFFT
+    const w_horiz_spatial = compute1DIFFT(w_horiz_fft.real, w_horiz_fft.imag);
+    const w_vert_spatial = compute1DIFFT(w_vert_fft.real, w_vert_fft.imag);
+
+    // Normalize to ensure proper scaling
+    // The inverse kernel should have unit DC response (sum = 1) when convolved with original
+    let sum_inv_h = 0;
+    let sum_inv_v = 0;
     for (let i = 0; i < size; i++) {
-      const inv_h = (1.0 - horiz[i]) / (1.0 + lambda * 10);
-      const inv_v = (1.0 - vert[i]) / (1.0 + lambda * 10);
-      horiz[i] = Math.max(0, inv_h);
-      vert[i] = Math.max(0, inv_v);
+      sum_inv_h += w_horiz_spatial[i];
+      sum_inv_v += w_vert_spatial[i];
     }
 
-    // Renormalize to preserve energy
-    sum_h = 0;
-    sum_v = 0;
-    for (let i = 0; i < size; i++) {
-      sum_h += Math.abs(horiz[i]);
-      sum_v += Math.abs(vert[i]);
+    // If sum is near zero, the filter might be unstable - use identity
+    const epsilon = 1e-6;
+    if (Math.abs(sum_inv_h) < epsilon || Math.abs(sum_inv_v) < epsilon) {
+      // Fallback: return identity kernel (no correction)
+      const identity_h = new Float32Array(size);
+      const identity_v = new Float32Array(size);
+      identity_h[center] = 1.0;
+      identity_v[center] = 1.0;
+      return { horiz: identity_h, vert: identity_v };
     }
+
+    // Normalize so that convolution with original kernel ≈ delta function
+    // But also clamp extreme values to prevent artifacts
+    const horiz = new Float32Array(size);
+    const vert = new Float32Array(size);
+    
+    // Find max absolute value to prevent overflow
+    let max_abs_h = 0;
+    let max_abs_v = 0;
     for (let i = 0; i < size; i++) {
-      horiz[i] /= sum_h;
-      vert[i] /= sum_v;
+      max_abs_h = Math.max(max_abs_h, Math.abs(w_horiz_spatial[i]));
+      max_abs_v = Math.max(max_abs_v, Math.abs(w_vert_spatial[i]));
+    }
+    
+    // Normalize and clamp to reasonable range
+    // Limit kernel values to prevent extreme amplification
+    const max_kernel_value = 5.0; // Prevent kernels from being too extreme
+    const scale_h = Math.min(1.0, max_kernel_value / max_abs_h);
+    const scale_v = Math.min(1.0, max_kernel_value / max_abs_v);
+    
+    for (let i = 0; i < size; i++) {
+      horiz[i] = w_horiz_spatial[i] * scale_h;
+      vert[i] = w_vert_spatial[i] * scale_v;
     }
 
     return { horiz, vert };

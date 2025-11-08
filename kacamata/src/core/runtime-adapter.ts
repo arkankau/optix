@@ -102,10 +102,19 @@ export class RuntimeAdapter {
     }
 
     // Generate separable inverse kernels if applicable
+    // Note: Kernels are generated with a base lambda, but lambda can be adjusted
+    // at runtime via the processFrame parameter for fine-tuning
     if (psf.separable) {
-      const { horiz, vert } = WienerEngine.generateSeparableInverse(psf, 0.008);
+      // Use adaptive lambda - ensure it's not too small to prevent artifacts
+      // Default lambda of 0.02-0.05 works better than 0.008 for preventing over-amplification
+      // Lower lambda = sharper but more artifacts, higher lambda = smoother but less correction
+      const baseLambda = 0.02; // More conservative default
+      const adaptiveLambda = Math.max(0.01, Math.min(0.1, baseLambda));
+      const { horiz, vert } = WienerEngine.generateSeparableInverse(psf, adaptiveLambda);
       psf.inv_horiz = horiz;
       psf.inv_vert = vert;
+      // Store the lambda used for this kernel set for reference
+      (psf as any).generated_lambda = adaptiveLambda;
     }
 
     // Build LUT if LFD-inspired mode

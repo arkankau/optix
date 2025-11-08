@@ -89,9 +89,9 @@ export class VisionEngine {
     kernel: Kernel,
     lambda: number
   ): ArrayBuffer {
-    const { buffer, width, height } = params;
+    const { buffer, width, height, contrast_boost } = params;
     const input = new Uint8Array(buffer!);
-    const result = WienerEngine.processFrame(input, width, height, kernel, lambda);
+    const result = WienerEngine.processFrame(input, width, height, kernel, lambda, contrast_boost);
     return result.buffer as ArrayBuffer;
   }
 

@@ -64,6 +64,7 @@ export interface ProcessFrameParams {
   psfParams: PSFParams;
   lambda: number;
   lfd_inspired?: boolean;
+  contrast_boost?: number;
 }
 
 export interface WavefrontApprox {

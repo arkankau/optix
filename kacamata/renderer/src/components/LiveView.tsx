@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Profile } from '../types';
 import { Controls } from './Controls';
+import { ImageTestView } from './ImageTestView';
 import { useScreenCapture } from '../hooks/useScreenCapture';
 import { useDistanceTracking } from '../hooks/useDistanceTracking';
 
@@ -10,16 +11,26 @@ interface Props {
 }
 
 export function LiveView({ profile, isOverlay }: Props) {
+  const [showImageTest, setShowImageTest] = useState(false);
+  
+  // Show image test view if enabled
+  if (showImageTest) {
+    return <ImageTestView profile={profile} onBack={() => setShowImageTest(false)} />;
+  }
+
   const [isProcessing, setIsProcessing] = useState(true); // Start with processing ON by default
   const [splitMode, setSplitMode] = useState(true);
   const [lfdInspired, setLfdInspired] = useState(false); // LFD-inspired mode toggle
   const [fps, setFps] = useState(0);
   const [latency, setLatency] = useState(0);
-  const [lambda, setLambda] = useState(profile?.wiener_lambda ?? 0.008);
+  const [lambda, setLambda] = useState(profile?.wiener_lambda ?? 0.02);
+  const [myopia, setMyopia] = useState(profile?.rx.sphere_D ?? -4.0);
+  const [manualDistance, setManualDistance] = useState(60);
+  const [cylinder, setCylinder] = useState(profile?.rx.cylinder_D ?? 0);
   const [debugInfo, setDebugInfo] = useState({
     sigmaX: 0,
     sigmaY: 0,
-    lambda: profile?.wiener_lambda ?? 0.008,
+    lambda: profile?.wiener_lambda ?? 0.02,
     bypass: false,
   });
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -31,21 +42,32 @@ export function LiveView({ profile, isOverlay }: Props) {
   const { distance } = useDistanceTracking(true);
 
   useEffect(() => {
-    const baseLambda = profile?.wiener_lambda ?? 0.008;
+    const baseLambda = profile?.wiener_lambda ?? 0.02;
     setLambda(baseLambda);
     setDebugInfo((info) => ({ ...info, lambda: baseLambda }));
+    if (profile) {
+      setMyopia(profile.rx.sphere_D);
+      setCylinder(profile.rx.cylinder_D ?? 0);
+    }
   }, [profile]);
+
+  // Update manual distance when tracked distance changes
+  useEffect(() => {
+    setManualDistance(distance);
+  }, [distance]);
 
   useEffect(() => {
     if (!profile) return;
 
     // Initialize vision engine with profile
+    // Apply correction strength to prescription for stronger/weaker correction
     window.electronAPI?.vision
       .updatePSF(
       {
-        sphere_D: profile.rx.sphere_D,
-        cylinder_D: profile.rx.cylinder_D,
-        distance_cm: distance,
+        sphere_D: myopia,
+        cylinder_D: cylinder !== 0 ? cylinder : undefined,
+        axis_deg: profile.rx.axis_deg,
+        distance_cm: manualDistance,
         display_ppi: profile.ppi,
         display_width_px: profile.display.width_px,
         display_height_px: profile.display.height_px,
@@ -64,7 +86,7 @@ export function LiveView({ profile, isOverlay }: Props) {
         }
       })
       .catch((err: any) => console.error('updatePSF error', err));
-  }, [profile, distance, lfdInspired]);
+  }, [profile, manualDistance, lfdInspired, myopia, cylinder]);
 
   useEffect(() => {
     if (!stream || !profile) {
@@ -81,7 +103,7 @@ export function LiveView({ profile, isOverlay }: Props) {
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [stream, profile, isProcessing, distance, lambda, lfdInspired]);
+  }, [stream, profile, isProcessing, manualDistance, lambda, lfdInspired, myopia, cylinder]);
 
   const startCaptureLoop = () => {
     if (!videoRef.current || !canvasRef.current || !processedCanvasRef.current) {
@@ -152,9 +174,10 @@ export function LiveView({ profile, isOverlay }: Props) {
               width: canvas.width,
               height: canvas.height,
               psfParams: {
-                sphere_D: profile.rx.sphere_D,
-                cylinder_D: profile.rx.cylinder_D,
-                distance_cm: distance,
+                sphere_D: myopia,
+                cylinder_D: cylinder !== 0 ? cylinder : undefined,
+                axis_deg: profile.rx.axis_deg,
+                distance_cm: manualDistance,
                 display_ppi: profile.ppi,
                 display_width_px: profile.display.width_px,
                 display_height_px: profile.display.height_px,
@@ -162,6 +185,7 @@ export function LiveView({ profile, isOverlay }: Props) {
               },
               lambda,
               lfd_inspired: lfdInspired,
+              contrast_boost: 1.0,
             });
 
               if (processed) {
@@ -412,12 +436,22 @@ export function LiveView({ profile, isOverlay }: Props) {
         onToggleLFD={() => setLfdInspired(!lfdInspired)}
         onFeedback={handleFeedback}
         lambda={lambda}
+        onLambdaChange={(newLambda) => {
+          setLambda(newLambda);
+          setDebugInfo((info) => ({ ...info, lambda: newLambda }));
+        }}
         sigmaX={debugInfo.sigmaX}
         sigmaY={debugInfo.sigmaY}
         bypass={debugInfo.bypass}
         fps={fps}
         latency={latency}
-        distance={distance}
+        distance={manualDistance}
+        myopia={myopia}
+        onMyopiaChange={setMyopia}
+        onDistanceChange={setManualDistance}
+        cylinder={cylinder}
+        onCylinderChange={setCylinder}
+        onTestImage={() => setShowImageTest(true)}
       />
     </div>
   );

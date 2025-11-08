@@ -11,12 +11,19 @@ interface Props {
   onToggleLFD: () => void;
   onFeedback: (feedback: 'too_blurry' | 'too_sharp' | 'ok') => void;
   lambda: number;
+  onLambdaChange: (lambda: number) => void;
   sigmaX: number;
   sigmaY: number;
   bypass: boolean;
   fps: number;
   latency: number;
   distance: number;
+  myopia?: number;
+  onMyopiaChange?: (myopia: number) => void;
+  onDistanceChange?: (distance: number) => void;
+  cylinder?: number;
+  onCylinderChange?: (cylinder: number) => void;
+  onTestImage?: () => void;
 }
 
 export function Controls({
@@ -29,12 +36,19 @@ export function Controls({
   onToggleLFD,
   onFeedback,
   lambda,
+  onLambdaChange,
   sigmaX,
   sigmaY,
   bypass,
   fps,
   latency,
   distance,
+  myopia,
+  onMyopiaChange,
+  onDistanceChange,
+  cylinder,
+  onCylinderChange,
+  onTestImage,
 }: Props) {
   const handleFeedback = (type: 'too_blurry' | 'too_sharp' | 'ok') => {
     onFeedback(type);
@@ -95,6 +109,22 @@ export function Controls({
           {lfdInspired ? 'LFD Mode' : '2D Mode'}
         </button>
 
+        {onTestImage && (
+          <button
+            onClick={onTestImage}
+            style={{
+              padding: '12px 24px',
+              background: '#ff9800',
+              color: 'white',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: '600',
+            }}
+          >
+            Test Image Correction
+          </button>
+        )}
+
         <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto' }}>
           <button
             onClick={() => handleFeedback('too_blurry')}
@@ -138,12 +168,135 @@ export function Controls({
         </div>
       </div>
 
+      {/* Real-time Parameter Controls - Compact Sliders */}
+      <div
+        style={{
+          display: 'flex',
+          gap: '20px',
+          padding: '12px 16px',
+          background: '#252525',
+          borderRadius: '8px',
+          border: '1px solid #444',
+          flexWrap: 'wrap',
+        }}
+      >
+        {/* Myopia Slider */}
+        {onMyopiaChange && myopia !== undefined && (
+          <div style={{ flex: '1', minWidth: '180px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+              <label style={{ fontSize: '12px', color: '#ccc' }}>Myopia:</label>
+              <span style={{ fontSize: '12px', color: '#4caf50', fontFamily: 'monospace' }}>
+                {myopia.toFixed(2)}D
+              </span>
+            </div>
+            <input
+              type="range"
+              min="-8.0"
+              max="0.0"
+              step="0.25"
+              value={myopia}
+              onChange={(e) => onMyopiaChange(parseFloat(e.target.value))}
+              style={{
+                width: '100%',
+                height: '4px',
+                borderRadius: '2px',
+                background: '#444',
+                outline: 'none',
+                cursor: 'pointer',
+              }}
+            />
+          </div>
+        )}
+
+        {/* Distance Slider */}
+        {onDistanceChange && (
+          <div style={{ flex: '1', minWidth: '180px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+              <label style={{ fontSize: '12px', color: '#ccc' }}>Distance:</label>
+              <span style={{ fontSize: '12px', color: '#2196f3', fontFamily: 'monospace' }}>
+                {distance.toFixed(0)}cm
+              </span>
+            </div>
+            <input
+              type="range"
+              min="30"
+              max="100"
+              step="5"
+              value={distance}
+              onChange={(e) => onDistanceChange(parseFloat(e.target.value))}
+              style={{
+                width: '100%',
+                height: '4px',
+                borderRadius: '2px',
+                background: '#444',
+                outline: 'none',
+                cursor: 'pointer',
+              }}
+            />
+          </div>
+        )}
+
+        {/* Cylinder Slider */}
+        {onCylinderChange && cylinder !== undefined && (
+          <div style={{ flex: '1', minWidth: '180px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+              <label style={{ fontSize: '12px', color: '#ccc' }}>Cylinder:</label>
+              <span style={{ fontSize: '12px', color: '#ff9800', fontFamily: 'monospace' }}>
+                {cylinder.toFixed(2)}D
+              </span>
+            </div>
+            <input
+              type="range"
+              min="-4.0"
+              max="4.0"
+              step="0.25"
+              value={cylinder}
+              onChange={(e) => onCylinderChange(parseFloat(e.target.value))}
+              style={{
+                width: '100%',
+                height: '4px',
+                borderRadius: '2px',
+                background: '#444',
+                outline: 'none',
+                cursor: 'pointer',
+              }}
+            />
+          </div>
+        )}
+
+        {/* Lambda Slider (compact) */}
+        <div style={{ flex: '1', minWidth: '150px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+            <label style={{ fontSize: '12px', color: '#ccc' }}>λ:</label>
+            <span style={{ fontSize: '12px', color: '#9c27b0', fontFamily: 'monospace' }}>
+              {lambda.toFixed(3)}
+            </span>
+          </div>
+          <input
+            type="range"
+            min="0.001"
+            max="0.1"
+            step="0.001"
+            value={lambda}
+            onChange={(e) => onLambdaChange(parseFloat(e.target.value))}
+            style={{
+              width: '100%',
+              height: '4px',
+              borderRadius: '2px',
+              background: '#444',
+              outline: 'none',
+              cursor: 'pointer',
+            }}
+          />
+        </div>
+      </div>
+
       <div
         style={{
           display: 'flex',
           gap: '24px',
           fontSize: '13px',
-          opacity: 0.8,
+          opacity: '0.8',
           flexWrap: 'wrap',
         }}
       >
