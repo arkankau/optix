@@ -1,20 +1,30 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useAI } from '../contexts/AIContext';
 import { useTestStore } from '../store/testStore';
 import { useAIAgent } from '../hooks/useAIAgent';
-import ElevenLabsWidget from './ElevenLabsWidget';
+import ConversationPanel from './ConversationPanel';
+import { ElevenLabsConversation, ConversationMessage } from '../services/elevenLabsConversation';
 
 interface GlobalAIAssistantProps {
-  agentId: string;
+  agentId?: string; // Optional - will be fetched from backend
 }
 
-export default function GlobalAIAssistant({ agentId }: GlobalAIAssistantProps) {
+export default function GlobalAIAssistant({ agentId: providedAgentId }: GlobalAIAssistantProps) {
   const { isAIActive } = useAI();
   const { stage, currentEye, setElevenLabsReady, addPatientTranscription } = useTestStore();
   const { startAgent, agentThinking, executeManualAction, lastMessage } = useAIAgent();
   const [lastStage, setLastStage] = useState(stage);
-  const [showManualControls, setShowManualControls] = useState(false); // Hidden by default - xAI controls everything
-  const [widgetReady, setWidgetReady] = useState(false);
+  const [showManualControls, setShowManualControls] = useState(false);
+  
+  // Conversation state
+  const [agentId, setAgentId] = useState<string | null>(providedAgentId || null);
+  const [messages, setMessages] = useState<ConversationMessage[]>([]);
+  const [status, setStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('disconnected');
+  const [isListening, setIsListening] = useState(false);
+  const [isAgentSpeaking, setIsAgentSpeaking] = useState(false);
+  const [showPanel, setShowPanel] = useState(false);
+  
+  const conversationRef = useRef<ElevenLabsConversation | null>(null);
 
   // Start AI agent when AI is activated (don't wait for widget)
   useEffect(() => {
@@ -48,48 +58,105 @@ export default function GlobalAIAssistant({ agentId }: GlobalAIAssistantProps) {
     }
   }, [stage, lastStage, isAIActive]);
 
-  // Handle ElevenLabs widget ready
-  const handleWidgetReady = () => {
-    console.log('✅ ElevenLabs widget is ready');
-    setWidgetReady(true);
-    setElevenLabsReady(true);
+  // Initialize ElevenLabs conversation when AI is activated
+  useEffect(() => {
+    if (isAIActive && !conversationRef.current) {
+      initializeConversation();
+    }
+
+    return () => {
+      // Cleanup on unmount
+      conversationRef.current?.disconnect();
+    };
+  }, [isAIActive]);
+
+  // Initialize conversation
+  const initializeConversation = async () => {
+    try {
+      // Get or create agent
+      let id = agentId;
+      if (!id) {
+        console.log('🔄 Fetching agent from backend...');
+        const response = await fetch('/api/elevenlabs/agent');
+        const data = await response.json();
+        id = data.agentId;
+        setAgentId(id);
+      }
+
+      // Create conversation instance
+      const conversation = new ElevenLabsConversation();
+      conversationRef.current = conversation;
+
+      // Set up callbacks
+      conversation.onMessage((message) => {
+        console.log(`💬 ${message.type}: ${message.text}`);
+        setMessages((prev) => [...prev, message]);
+
+        // If user message, store for xAI analysis
+        if (message.type === 'user') {
+          addPatientTranscription({
+            timestamp: message.timestamp,
+            text: message.text,
+            eye: currentEye,
+            line: 0, // Will be set by test page
+            stage: stage,
+          });
+        }
+      });
+
+      conversation.onStatus((newStatus) => {
+        console.log('📡 Status:', newStatus);
+        setStatus(newStatus);
+        setElevenLabsReady(newStatus === 'connected');
+      });
+
+      conversation.onAgentSpeaking((speaking) => {
+        setIsAgentSpeaking(speaking);
+      });
+
+      // Connect to agent
+      await conversation.connect(id);
+      setShowPanel(true);
+
+      console.log('✅ ElevenLabs conversation initialized');
+    } catch (error) {
+      console.error('❌ Failed to initialize conversation:', error);
+      setStatus('error');
+    }
   };
 
-  // Handle messages from ElevenLabs widget
-  const handleWidgetMessage = (message: string, isUser: boolean) => {
-    console.log(`🎤 ElevenLabs ${isUser ? 'User' : 'AI'}: ${message}`);
-    
-    // Only process user messages (patient speech)
-    // AI messages are just the agent speaking back
-    if (isUser) {
-      // Store patient transcription for the current stage
-      // The specific test pages (SphereTest, JCCTest) will handle the analysis
-      addPatientTranscription({
-        timestamp: Date.now(),
-        text: message,
-        eye: currentEye,
-        line: 0, // Will be set by the test page
-        stage: stage,
-      });
-    }
+  // Handle start/stop listening
+  const handleStartListening = () => {
+    conversationRef.current?.startListening();
+    setIsListening(true);
+  };
+
+  const handleStopListening = () => {
+    conversationRef.current?.stopListening();
+    setIsListening(false);
+  };
+
+  // Handle close panel
+  const handleClosePanel = () => {
+    conversationRef.current?.disconnect();
+    setShowPanel(false);
+    setStatus('disconnected');
+    setElevenLabsReady(false);
   };
 
   return (
     <>
-      {/* ElevenLabs Conversational Widget - Global Floating */}
-      {isAIActive && (
-        <div style={{
-          position: 'fixed',
-          bottom: '20px',
-          right: '20px',
-          zIndex: 9999,
-        }}>
-          <ElevenLabsWidget
-            agentId={agentId}
-            onMessage={handleWidgetMessage}
-            onReady={handleWidgetReady}
-          />
-        </div>
+      {/* Conversation Panel - Floating with movie-style subtitles */}
+      {showPanel && (
+        <ConversationPanel
+          messages={messages}
+          status={status}
+          isListening={isListening}
+          isAgentSpeaking={isAgentSpeaking}
+          onStartListening={handleStartListening}
+          onStopListening={handleStopListening}
+          onClose={handleClosePanel}
+        />
       )}
 
       {/* Agent thinking indicator */}

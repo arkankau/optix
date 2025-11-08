@@ -8,8 +8,6 @@ import SphereTest from './pages/SphereTest';
 import JCCTest from './pages/JCCTest';
 import Summary from './pages/Summary';
 
-const ELEVENLABS_AGENT_ID = 'agent_0801k9h75d11eh2bjnwsmkn9t932';
-
 function App() {
   return (
     <Router>
@@ -26,8 +24,8 @@ function App() {
             </Routes>
           </main>
           
-          {/* Global AI Assistant - always present once activated */}
-          <GlobalAIAssistant agentId={ELEVENLABS_AGENT_ID} />
+          {/* Global AI Assistant - SDK-based conversation */}
+          <GlobalAIAssistant />
         </div>
       </AIProvider>
     </Router>

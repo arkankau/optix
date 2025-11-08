@@ -9,6 +9,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@elevenlabs/elevenlabs-js": "^2.22.0",
     "@nearify/agent": "workspace:*",
     "@nearify/core": "workspace:*",
     "@nearify/voice": "workspace:*",
@@ -30,4 +31,3 @@
     "typescript": "^5.3.3"
   }
 }
-

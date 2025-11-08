@@ -19,6 +19,7 @@ import agentRouter from "./routes/agent";
 import staircaseRouter from "./routes/staircase";
 import jccRouter from "./routes/jcc";
 import summaryRouter from "./routes/summary";
+import elevenlabsRouter from "./routes/elevenlabs";
 
 const app = express();
 const PORT = process.env.PORT || 8787;
@@ -49,6 +50,7 @@ app.use("/api/agent", agentRouter);
 app.use("/api/staircase", staircaseRouter);
 app.use("/api/jcc", jccRouter);
 app.use("/api/summary", summaryRouter);
+app.use("/api/elevenlabs", elevenlabsRouter);
 
 // 404 handler
 app.use((req, res) => {

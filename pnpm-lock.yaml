@@ -24,6 +24,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@elevenlabs/elevenlabs-js':
+        specifier: ^2.22.0
+        version: 2.22.0
       '@nearify/agent':
         specifier: workspace:*
         version: link:../../packages/agent
@@ -79,6 +82,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@elevenlabs/elevenlabs-js':
+        specifier: ^2.22.0
+        version: 2.22.0
       react:
         specifier: ^18.2.0
         version: 18.3.1
