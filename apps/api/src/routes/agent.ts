@@ -47,7 +47,7 @@ Analyze the message and return the tools you want to call.`;
     const response = await axios.post(
       XAI_API_URL,
       {
-        model: 'grok-beta',
+        model: 'grok-2-latest',
         messages: [
           { role: 'system', content: systemPrompt },
           {
@@ -270,7 +270,7 @@ Respond in JSON format:
     const response = await axios.post(
       XAI_API_URL,
       {
-        model: 'grok-beta',
+        model: 'grok-2-latest',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
