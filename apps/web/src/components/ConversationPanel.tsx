@@ -3,7 +3,6 @@ import type { ConversationMessage } from '../services/elevenLabsConversation';
 
 interface ConversationPanelProps {
   messages: ConversationMessage[];
-  status: 'connecting' | 'connected' | 'disconnected' | 'error';
   isListening: boolean;
   isAgentSpeaking: boolean;
   onStartListening: () => void;
@@ -13,7 +12,6 @@ interface ConversationPanelProps {
 
 export default function ConversationPanel({
   messages,
-  status,
   isListening,
   isAgentSpeaking,
   onStartListening,

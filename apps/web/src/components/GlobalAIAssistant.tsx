@@ -3,7 +3,7 @@ import { useAI } from '../contexts/AIContext';
 import { useTestStore } from '../store/testStore';
 import { useAIAgent } from '../hooks/useAIAgent';
 import ConversationPanel from './ConversationPanel';
-import { ElevenLabsConversation, ConversationMessage } from '../services/elevenLabsConversation';
+import { SimpleConversation, ConversationMessage } from '../services/simpleConversation';
 
 interface GlobalAIAssistantProps {
   agentId?: string; // Optional - will be fetched from backend
@@ -17,14 +17,12 @@ export default function GlobalAIAssistant({ agentId: providedAgentId }: GlobalAI
   const [showManualControls, setShowManualControls] = useState(false);
   
   // Conversation state
-  const [agentId, setAgentId] = useState<string | null>(providedAgentId || null);
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
-  const [status, setStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('disconnected');
   const [isListening, setIsListening] = useState(false);
   const [isAgentSpeaking, setIsAgentSpeaking] = useState(false);
   const [showPanel, setShowPanel] = useState(false);
   
-  const conversationRef = useRef<ElevenLabsConversation | null>(null);
+  const conversationRef = useRef<SimpleConversation | null>(null);
 
   // Start AI agent when AI is activated (don't wait for widget)
   useEffect(() => {
@@ -58,7 +56,7 @@ export default function GlobalAIAssistant({ agentId: providedAgentId }: GlobalAI
     }
   }, [stage, lastStage, isAIActive]);
 
-  // Initialize ElevenLabs conversation when AI is activated
+  // Initialize simple conversation when AI is activated
   useEffect(() => {
     if (isAIActive && !conversationRef.current) {
       initializeConversation();
@@ -66,25 +64,17 @@ export default function GlobalAIAssistant({ agentId: providedAgentId }: GlobalAI
 
     return () => {
       // Cleanup on unmount
-      conversationRef.current?.disconnect();
+      conversationRef.current?.destroy();
     };
   }, [isAIActive]);
 
   // Initialize conversation
-  const initializeConversation = async () => {
+  const initializeConversation = () => {
     try {
-      // Get or create agent
-      let id = agentId;
-      if (!id) {
-        console.log('🔄 Fetching agent from backend...');
-        const response = await fetch('/api/elevenlabs/agent');
-        const data = await response.json();
-        id = data.agentId;
-        setAgentId(id);
-      }
-
+      console.log('🎤 Initializing simple conversation...');
+      
       // Create conversation instance
-      const conversation = new ElevenLabsConversation();
+      const conversation = new SimpleConversation();
       conversationRef.current = conversation;
 
       // Set up callbacks
@@ -104,32 +94,25 @@ export default function GlobalAIAssistant({ agentId: providedAgentId }: GlobalAI
         }
       });
 
-      conversation.onStatus((newStatus) => {
-        console.log('📡 Status:', newStatus);
-        setStatus(newStatus);
-        
-        // Update elevenLabsReady based on connection status
-        if (newStatus === 'connected') {
-          setElevenLabsReady(true);
-          console.log('✅ ElevenLabs ready - VoiceButton will be hidden');
-        } else if (newStatus === 'disconnected' || newStatus === 'error') {
-          setElevenLabsReady(false);
-          console.log('❌ ElevenLabs not ready - VoiceButton will be shown');
-        }
-      });
-
       conversation.onAgentSpeaking((speaking) => {
         setIsAgentSpeaking(speaking);
       });
 
-      // Connect to agent
-      await conversation.connect(id);
+      conversation.onListening((listening) => {
+        setIsListening(listening);
+      });
+
+      // Ready immediately
+      setElevenLabsReady(true);
       setShowPanel(true);
 
-      console.log('✅ ElevenLabs conversation initialized');
+      // Initial greeting
+      conversation.speak('Hello! I\'m your eye test assistant. Let\'s begin the examination. Please cover your left eye and look at the chart.');
+
+      console.log('✅ Simple conversation initialized');
     } catch (error) {
       console.error('❌ Failed to initialize conversation:', error);
-      setStatus('error');
+      setElevenLabsReady(false);
     }
   };
 
@@ -158,7 +141,6 @@ export default function GlobalAIAssistant({ agentId: providedAgentId }: GlobalAI
       {showPanel && (
         <ConversationPanel
           messages={messages}
-          status={status}
           isListening={isListening}
           isAgentSpeaking={isAgentSpeaking}
           onStartListening={handleStartListening}
@@ -304,4 +286,5 @@ export default function GlobalAIAssistant({ agentId: providedAgentId }: GlobalAI
     </>
   );
 }
+
 
