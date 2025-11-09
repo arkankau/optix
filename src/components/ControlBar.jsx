@@ -5,9 +5,11 @@ function ControlBar({
   sphere,
   cylinder,
   axis,
+  distance,
   setSphere,
   setCylinder,
   setAxis,
+  setDistance,
   overlayVisible,
   onToggleOverlay,
   onClose
@@ -125,6 +127,30 @@ function ControlBar({
           <div className="range-labels">
             <span>0°</span>
             <span>180°</span>
+          </div>
+        </div>
+
+        <div className="control-group">
+          <label className="control-label">
+            <span>Distance (cm)</span>
+            <span className="control-value">{distance.toFixed(0)} cm</span>
+          </label>
+          <input
+            type="range"
+            min="30"
+            max="100"
+            step="5"
+            value={distance}
+            onChange={(e) => {
+              const newValue = parseFloat(e.target.value);
+              console.log(`🟣 Distance changed: ${newValue.toFixed(0)} cm`);
+              setDistance(newValue);
+            }}
+            className="slider"
+          />
+          <div className="range-labels">
+            <span>30 cm</span>
+            <span>100 cm</span>
           </div>
         </div>
 

@@ -32,34 +32,45 @@ function createWindow() {
   // Load the app
   if (process.env.NODE_ENV === 'development' || !app.isPackaged) {
     mainWindow.loadURL('http://localhost:5173');
-    mainWindow.webContents.openDevTools(); // Open dev tools to see console
+    // Don't open DevTools automatically - logs go to terminal
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
 
-  // Register global shortcuts after window is loaded
+  // Register global shortcuts immediately (don't wait for page load)
+  registerShortcuts();
+  console.log('✅ Global shortcuts registered immediately');
+  
+  // Also log when page finishes loading
   mainWindow.webContents.once('did-finish-load', () => {
-    registerShortcuts();
-    console.log('Global shortcuts registered');
+    console.log('✅ Page finished loading');
   });
 }
 
 function registerShortcuts() {
   // Unregister all shortcuts first to avoid conflicts
   globalShortcut.unregisterAll();
+  console.log('📋 Registering shortcuts...');
 
   // Ctrl+Shift+C: Toggle control bar
+  console.log('🔧 Attempting to register Ctrl+Shift+C...');
   const shortcut1 = globalShortcut.register('CommandOrControl+Shift+C', () => {
-    console.log('Ctrl+Shift+C pressed - toggling control bar');
+    console.log('🔥 Ctrl+Shift+C pressed - toggling control bar');
     if (mainWindow && !mainWindow.isDestroyed()) {
+      console.log('📤 Sending toggle-control-bar to renderer');
       mainWindow.webContents.send('toggle-control-bar');
+      console.log('✅ Event sent successfully');
+    } else {
+      console.error('❌ mainWindow is null or destroyed');
     }
   });
   
+  console.log('🔍 Shortcut1 registration result:', shortcut1);
+  
   if (shortcut1) {
-    console.log('Successfully registered Ctrl+Shift+C');
+    console.log('✅ Successfully registered Ctrl+Shift+C');
   } else {
-    console.error('Failed to register Ctrl+Shift+C');
+    console.error('❌ Failed to register Ctrl+Shift+C - shortcut may already be taken by another app');
   }
 
   // Ctrl+Shift+W: Close app

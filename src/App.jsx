@@ -5,9 +5,10 @@ import './App.css';
 
 function App() {
   // Optical parameters state
-  const [sphere, setSphere] = useState(0);
-  const [cylinder, setCylinder] = useState(0);
-  const [axis, setAxis] = useState(0);
+  const [sphere, setSphere] = useState(2.0);
+  const [cylinder, setCylinder] = useState(0.75);
+  const [axis, setAxis] = useState(90);
+  const [distance, setDistance] = useState(60); // Added distance parameter in cm
 
   // UI state
   const [showControlBar, setShowControlBar] = useState(false);
@@ -15,22 +16,33 @@ function App() {
 
   // Listen for keyboard shortcut from Electron main process
   useEffect(() => {
+    console.log('🚀 App.jsx useEffect running - checking electronAPI...');
+    console.log('🔍 window.electronAPI exists?', !!window.electronAPI);
+    console.log('🔍 window.electronAPI.onToggleControlBar exists?', !!window.electronAPI?.onToggleControlBar);
+    
     if (window.electronAPI) {
-      console.log('Setting up keyboard shortcut listener');
-      window.electronAPI.onToggleControlBar(() => {
+      console.log('✅ Setting up keyboard shortcut listener');
+      
+      const handleToggle = () => {
         console.log('🎮 Toggle control bar triggered from shortcut');
         setShowControlBar(prev => {
-          console.log(`Control bar: ${prev ? 'hiding' : 'showing'}`);
-          return !prev;
+          const newState = !prev;
+          console.log(`Control bar: ${prev ? 'hiding' : 'showing'} -> ${newState}`);
+          return newState;
         });
-      });
+      };
+      
+      window.electronAPI.onToggleControlBar(handleToggle);
+      
+      console.log('✅ Shortcut listener registered successfully');
     } else {
-      console.warn('electronAPI not available - running in browser mode?');
+      console.warn('⚠️ electronAPI not available - running in browser mode?');
     }
 
     // Cleanup
     return () => {
-      if (window.electronAPI) {
+      if (window.electronAPI && window.electronAPI.removeAllListeners) {
+        console.log('🧹 Cleaning up shortcut listener');
         window.electronAPI.removeAllListeners('toggle-control-bar');
       }
     };
@@ -50,13 +62,14 @@ function App() {
     console.log('📐 Parameters changed:', {
       sphere: sphere.toFixed(2),
       cylinder: cylinder.toFixed(2),
-      axis: axis.toFixed(0) + '°'
+      axis: axis.toFixed(0) + '°',
+      distance: distance + ' cm'
     });
     
     if (window.electronAPI) {
-      window.electronAPI.updateParameters({ sphere, cylinder, axis });
+      window.electronAPI.updateParameters({ sphere, cylinder, axis, distance });
     }
-  }, [sphere, cylinder, axis]);
+  }, [sphere, cylinder, axis, distance]);
 
   const handleToggleOverlay = () => {
     setOverlayVisible(prev => {
@@ -73,6 +86,7 @@ function App() {
           sphere={sphere}
           cylinder={cylinder}
           axis={axis}
+          distance={distance}
         />
       )}
 
@@ -81,9 +95,11 @@ function App() {
           sphere={sphere}
           cylinder={cylinder}
           axis={axis}
+          distance={distance}
           setSphere={setSphere}
           setCylinder={setCylinder}
           setAxis={setAxis}
+          setDistance={setDistance}
           overlayVisible={overlayVisible}
           onToggleOverlay={handleToggleOverlay}
           onClose={() => setShowControlBar(false)}
