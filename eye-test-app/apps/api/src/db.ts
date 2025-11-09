@@ -75,6 +75,8 @@ export const sessionQueries = {
 
   updateState: db.prepare("UPDATE sessions SET state = ? WHERE id = ?"),
 
+  getLatest: db.prepare("SELECT * FROM sessions ORDER BY datetime(createdAt) DESC LIMIT 1"),
+
   getAll: db.prepare("SELECT * FROM sessions ORDER BY createdAt DESC LIMIT 100"),
 };
 

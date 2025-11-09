@@ -7,6 +7,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setClickThrough: (enabled) => ipcRenderer.send('set-click-through', enabled),
   updateParameters: (parameters) => ipcRenderer.send('update-parameters', parameters),
   log: (message) => console.log('[Renderer]', message),
+  startEyeTest: () => ipcRenderer.invoke('eye-test:start'),
+  fetchLatestPrescription: () => ipcRenderer.invoke('eye-test:get-results'),
   
   // Receive messages from main process
   onToggleControlBar: (callback) => {
@@ -15,6 +17,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
       console.log('[Preload] toggle-control-bar event received!');
       callback();
     });
+  },
+  onPrescriptionUpdate: (callback) => {
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on('eye-test:updated', handler);
+    return () => ipcRenderer.removeListener('eye-test:updated', handler);
   },
   
   // Cleanup listeners

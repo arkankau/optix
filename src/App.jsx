@@ -3,80 +3,183 @@ import Overlay from './components/Overlay';
 import ControlBar from './components/ControlBar';
 import './App.css';
 
-function App() {
-  // Optical parameters state
-  const [sphere, setSphere] = useState(2.0);
-  const [cylinder, setCylinder] = useState(0.75);
-  const [axis, setAxis] = useState(90);
-  const [distance, setDistance] = useState(60); // Added distance parameter in cm
+const loadStoredPrescription = () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const stored = localStorage.getItem('optix.prescription');
+    return stored ? JSON.parse(stored) : null;
+  } catch {
+    return null;
+  }
+};
 
-  // UI state
-  const [showControlBar, setShowControlBar] = useState(false);
+function App() {
+  const stored = loadStoredPrescription();
+  const initialEye = stored?.selectedEye || 'OD';
+  const initialPrescription = stored?.rx || null;
+  const initialEyeMetrics =
+    initialPrescription?.[initialEye] ||
+    initialPrescription?.OD ||
+    (initialPrescription ? Object.values(initialPrescription)[0] : null);
+
+  const [prescription, setPrescription] = useState(initialPrescription);
+  const [selectedEye, setSelectedEye] = useState(initialEye);
+
+  const [sphere, setSphere] = useState(initialEyeMetrics?.S ?? 2.0);
+  const [cylinder, setCylinder] = useState(initialEyeMetrics?.C ?? 0.75);
+  const [axis, setAxis] = useState(initialEyeMetrics?.Axis ?? 90);
+  const [distance, setDistance] = useState(60);
+
+  const [showControlBar, setShowControlBar] = useState(!initialPrescription);
   const [overlayVisible, setOverlayVisible] = useState(true);
+  const [examStatus, setExamStatus] = useState(
+    initialPrescription ? `Using ${selectedEye} eye prescription` : 'No prescription loaded'
+  );
 
   // Listen for keyboard shortcut from Electron main process
   useEffect(() => {
-    console.log('🚀 App.jsx useEffect running - checking electronAPI...');
-    console.log('🔍 window.electronAPI exists?', !!window.electronAPI);
-    console.log('🔍 window.electronAPI.onToggleControlBar exists?', !!window.electronAPI?.onToggleControlBar);
-    
-    if (window.electronAPI) {
-      console.log('✅ Setting up keyboard shortcut listener');
-      
+    if (window.electronAPI?.onToggleControlBar) {
       const handleToggle = () => {
-        console.log('🎮 Toggle control bar triggered from shortcut');
-        setShowControlBar(prev => {
-          const newState = !prev;
-          console.log(`Control bar: ${prev ? 'hiding' : 'showing'} -> ${newState}`);
-          return newState;
-        });
+        setShowControlBar((prev) => !prev);
       };
-      
       window.electronAPI.onToggleControlBar(handleToggle);
-      
-      console.log('✅ Shortcut listener registered successfully');
-    } else {
-      console.warn('⚠️ electronAPI not available - running in browser mode?');
+      return () => {
+        window.electronAPI?.removeAllListeners?.('toggle-control-bar');
+      };
     }
-
-    // Cleanup
-    return () => {
-      if (window.electronAPI && window.electronAPI.removeAllListeners) {
-        console.log('🧹 Cleaning up shortcut listener');
-        window.electronAPI.removeAllListeners('toggle-control-bar');
-      }
-    };
   }, []);
 
-  // Update click-through based on control bar visibility
+  // Maintain click-through behavior
   useEffect(() => {
-    if (window.electronAPI) {
-      // Always maintain click-through for transparent areas
-      window.electronAPI.setClickThrough(true);
-      console.log(`🖱️ Control bar ${showControlBar ? 'visible' : 'hidden'} - click-through maintained`);
+    if (window.electronAPI?.setClickThrough) {
+      const enablePassThrough = !showControlBar;
+      window.electronAPI.setClickThrough(enablePassThrough);
     }
   }, [showControlBar]);
 
-  // Notify main process when parameters change and log to console
+  // Notify main process when parameters change
   useEffect(() => {
-    console.log('📐 Parameters changed:', {
-      sphere: sphere.toFixed(2),
-      cylinder: cylinder.toFixed(2),
-      axis: axis.toFixed(0) + '°',
-      distance: distance + ' cm'
-    });
-    
-    if (window.electronAPI) {
+    if (window.electronAPI?.updateParameters) {
       window.electronAPI.updateParameters({ sphere, cylinder, axis, distance });
     }
   }, [sphere, cylinder, axis, distance]);
 
+  // Apply prescription whenever it changes
+  useEffect(() => {
+    if (!prescription) return;
+    const eyeData =
+      prescription[selectedEye] ||
+      prescription.OD ||
+      Object.values(prescription)[0];
+    if (!eyeData) return;
+
+    setSphere(eyeData.S ?? 0);
+    setCylinder(eyeData.C ?? 0);
+    setAxis(eyeData.Axis ?? 0);
+
+    setExamStatus(`Using ${selectedEye} eye prescription`);
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(
+        'optix.prescription',
+        JSON.stringify({
+          rx: prescription,
+          selectedEye,
+          timestamp: Date.now(),
+        })
+      );
+    }
+  }, [prescription, selectedEye]);
+
+  useEffect(() => {
+    let unsubscribe;
+
+    const tryLoadLatest = async () => {
+      if (prescription) return;
+      try {
+        let payload = null;
+        if (window.electronAPI?.fetchLatestPrescription) {
+          payload = await window.electronAPI.fetchLatestPrescription();
+        } else {
+          const resp = await fetch('http://localhost:8787/api/summary/latest');
+          if (resp.ok) {
+            payload = await resp.json();
+          }
+        }
+        if (payload?.rx) {
+          setPrescription(payload.rx);
+          setSelectedEye('OD');
+          setShowControlBar(true);
+          setExamStatus('Loaded latest exam results');
+        }
+      } catch (error) {
+        console.warn('Unable to load latest prescription:', error);
+      }
+    };
+
+    tryLoadLatest();
+
+    if (window.electronAPI?.onPrescriptionUpdate) {
+      unsubscribe = window.electronAPI.onPrescriptionUpdate((payload) => {
+        if (payload?.rx) {
+          setPrescription(payload.rx);
+          setSelectedEye('OD');
+          setShowControlBar(true);
+          setExamStatus('New eye exam results received');
+        }
+      });
+    }
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [prescription]);
+
   const handleToggleOverlay = () => {
-    setOverlayVisible(prev => {
-      const newValue = !prev;
-      console.log(`👁️ Overlay visibility toggled: ${newValue ? 'VISIBLE' : 'HIDDEN'}`);
-      return newValue;
-    });
+    setOverlayVisible((prev) => !prev);
+  };
+
+  const launchEyeTest = async () => {
+    setShowControlBar(true);
+    setExamStatus('Launching eye exam...');
+    try {
+      if (window.electronAPI?.startEyeTest) {
+        await window.electronAPI.startEyeTest();
+        setExamStatus('Eye exam opened. Complete it, then load the latest result.');
+      } else {
+        window.open('http://localhost:5173', '_blank');
+        setExamStatus('Eye exam opened in browser tab.');
+      }
+    } catch (error) {
+      console.error('Failed to launch eye test:', error);
+      setExamStatus('Failed to launch eye exam');
+    }
+  };
+
+  const refreshPrescription = async () => {
+    setExamStatus('Fetching latest exam result...');
+    try {
+      let payload = null;
+      if (window.electronAPI?.fetchLatestPrescription) {
+        payload = await window.electronAPI.fetchLatestPrescription();
+      } else {
+        const resp = await fetch('http://localhost:8787/api/summary/latest');
+        if (resp.ok) {
+          payload = await resp.json();
+        }
+      }
+
+      if (payload?.rx) {
+        setPrescription(payload.rx);
+        setSelectedEye('OD');
+        setExamStatus('Prescription loaded from latest exam');
+      } else {
+        setExamStatus('No completed exam results found');
+      }
+    } catch (error) {
+      console.error('Failed to fetch prescription:', error);
+      setExamStatus('Error fetching exam results');
+    }
   };
 
   return (
@@ -103,6 +206,12 @@ function App() {
           overlayVisible={overlayVisible}
           onToggleOverlay={handleToggleOverlay}
           onClose={() => setShowControlBar(false)}
+          onLaunchEyeTest={launchEyeTest}
+          onRefreshPrescription={refreshPrescription}
+          prescription={prescription}
+          selectedEye={selectedEye}
+          onSelectEye={setSelectedEye}
+          examStatus={examStatus}
         />
       )}
     </div>

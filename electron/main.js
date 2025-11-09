@@ -1,11 +1,133 @@
 import { app, BrowserWindow, globalShortcut, ipcMain } from 'electron';
 import { fileURLToPath } from 'url';
 import path from 'path';
+import { spawn } from 'child_process';
+import fs from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 let mainWindow;
+let eyeTestWindow;
+let eyeTestProcess = null;
+let prescriptionWatcher = null;
+
+const rootDir = path.resolve(__dirname, '..');
+const overlayDevUrl = 'http://localhost:5123';
+const eyeTestDir = path.join(rootDir, 'eye-test-app');
+const eyeTestResultsDir = path.join(eyeTestDir, 'results');
+const prescriptionFile = path.join(eyeTestResultsDir, 'latest-prescription.json');
+
+function readLatestPrescription() {
+  try {
+    if (!fs.existsSync(prescriptionFile)) {
+      return null;
+    }
+    const raw = fs.readFileSync(prescriptionFile, 'utf-8');
+    return JSON.parse(raw);
+  } catch (error) {
+    console.error('❌ Failed to read prescription file:', error);
+    return null;
+  }
+}
+
+function broadcastPrescription() {
+  const data = readLatestPrescription();
+  if (data && mainWindow && !mainWindow.isDestroyed()) {
+    console.log('📡 Broadcasting updated prescription to renderer');
+    mainWindow.webContents.send('eye-test:updated', data);
+  }
+}
+
+function ensurePrescriptionWatcher() {
+  if (prescriptionWatcher) return;
+
+  if (!fs.existsSync(eyeTestResultsDir)) {
+    fs.mkdirSync(eyeTestResultsDir, { recursive: true });
+  }
+
+  try {
+    prescriptionWatcher = fs.watch(eyeTestResultsDir, (eventType, filename) => {
+      if (filename === 'latest-prescription.json') {
+        console.log('📁 Detected prescription file change');
+        broadcastPrescription();
+      }
+    });
+    console.log('👀 Watching for prescription updates in', eyeTestResultsDir);
+  } catch (error) {
+    console.error('❌ Failed to watch prescription directory:', error);
+  }
+}
+
+function stopPrescriptionWatcher() {
+  if (prescriptionWatcher) {
+    prescriptionWatcher.close();
+    prescriptionWatcher = null;
+  }
+}
+
+async function isEyeTestRunning() {
+  try {
+    const response = await fetch('http://localhost:5173/', { method: 'HEAD' });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function ensureEyeTestProcess() {
+  if (await isEyeTestRunning()) {
+    console.log('🔁 Eye test server already running on port 5173');
+    return;
+  }
+
+  if (eyeTestProcess && !eyeTestProcess.killed) {
+    return;
+  }
+
+  const command = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
+  eyeTestProcess = spawn(command, ['dev'], {
+    cwd: eyeTestDir,
+    shell: false,
+    env: { ...process.env },
+  });
+
+  eyeTestProcess.stdout.on('data', (data) => {
+    console.log(`[EyeTest] ${data.toString().trim()}`);
+  });
+
+  eyeTestProcess.stderr.on('data', (data) => {
+    console.error(`[EyeTest:err] ${data.toString().trim()}`);
+  });
+
+  eyeTestProcess.on('close', (code) => {
+    console.log(`👁️ Eye test process exited with code ${code}`);
+    eyeTestProcess = null;
+  });
+}
+
+function openEyeTestWindow() {
+  if (eyeTestWindow && !eyeTestWindow.isDestroyed()) {
+    eyeTestWindow.focus();
+    return;
+  }
+
+  eyeTestWindow = new BrowserWindow({
+    width: 1280,
+    height: 800,
+    title: 'OptiX Eye Test',
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+    },
+  });
+
+  const eyeTestUrl = 'http://localhost:5173';
+  eyeTestWindow.loadURL(eyeTestUrl);
+  eyeTestWindow.on('closed', () => {
+    eyeTestWindow = null;
+  });
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -31,7 +153,7 @@ function createWindow() {
 
   // Load the app
   if (process.env.NODE_ENV === 'development' || !app.isPackaged) {
-    mainWindow.loadURL('http://localhost:5173');
+    mainWindow.loadURL(overlayDevUrl);
     // Don't open DevTools automatically - logs go to terminal
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
@@ -45,6 +167,9 @@ function createWindow() {
   mainWindow.webContents.once('did-finish-load', () => {
     console.log('✅ Page finished loading');
   });
+
+  ensurePrescriptionWatcher();
+  broadcastPrescription();
 }
 
 function registerShortcuts() {
@@ -89,15 +214,31 @@ function registerShortcuts() {
 // IPC handlers
 ipcMain.on('set-click-through', (event, enabled) => {
   if (mainWindow) {
-    // Always keep click-through enabled, but allow interaction with control bar
-    mainWindow.setIgnoreMouseEvents(true, { forward: true });
-    console.log('Click-through maintained (always enabled)');
+    if (enabled) {
+      mainWindow.setIgnoreMouseEvents(true, { forward: true });
+      console.log('🪟 Overlay set to click-through (pass-through enabled)');
+    } else {
+      mainWindow.setIgnoreMouseEvents(false);
+      console.log('🪟 Overlay interactions enabled');
+    }
   }
 });
 
 ipcMain.on('update-parameters', (event, parameters) => {
   // This can be used to persist parameters or communicate with other processes
   console.log('📊 Parameters updated from main process:', parameters);
+});
+
+ipcMain.handle('eye-test:start', async () => {
+  console.log('🟢 Launching eye test pipeline');
+  await ensureEyeTestProcess();
+  ensurePrescriptionWatcher();
+  openEyeTestWindow();
+  return readLatestPrescription();
+});
+
+ipcMain.handle('eye-test:get-results', async () => {
+  return readLatestPrescription();
 });
 
 app.whenReady().then(() => {
@@ -119,5 +260,9 @@ app.on('window-all-closed', () => {
 app.on('will-quit', () => {
   // Unregister all shortcuts
   globalShortcut.unregisterAll();
+  stopPrescriptionWatcher();
+  if (eyeTestProcess && !eyeTestProcess.killed) {
+    eyeTestProcess.kill();
+  }
 });
 

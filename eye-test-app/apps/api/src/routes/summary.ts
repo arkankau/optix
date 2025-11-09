@@ -3,9 +3,25 @@
  */
 
 import { Router } from "express";
-import { rxQueries, sessionQueries, serializeParams } from "../db";
+import fs from "fs";
+import path from "path";
+import { rxQueries, sessionQueries } from "../db";
 
 const router = Router();
+const resultsDir = path.resolve(__dirname, "../../../../results");
+const resultsFile = path.join(resultsDir, "latest-prescription.json");
+
+function writeLatestPrescription(payload: any) {
+  try {
+    if (!fs.existsSync(resultsDir)) {
+      fs.mkdirSync(resultsDir, { recursive: true });
+    }
+    fs.writeFileSync(resultsFile, JSON.stringify(payload, null, 2));
+    console.log(`📝 Prescription written to ${resultsFile}`);
+  } catch (error) {
+    console.error("❌ Failed to write prescription file:", error);
+  }
+}
 
 /**
  * POST /api/summary
@@ -52,6 +68,12 @@ router.post("/", (req, res) => {
     console.log(`📊 Generated Rx for session ${sessionId}`);
     console.log(`   OD: ${OD.S} ${OD.C} × ${OD.Axis}°`);
     console.log(`   OS: ${OS.S} ${OS.C} × ${OS.Axis}°`);
+
+    writeLatestPrescription({
+      sessionId,
+      timestamp: Date.now(),
+      rx: { OD, OS },
+    });
 
     res.json({
       success: true,
@@ -126,6 +148,42 @@ router.get("/:sessionId/export", (req, res) => {
     res.send(csv);
   } catch (error: any) {
     console.error("Export error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get("/latest", (req, res) => {
+  try {
+    const latestSession = sessionQueries.getLatest.get();
+    if (!latestSession) {
+      return res.status(404).json({ error: "No sessions found" });
+    }
+
+    const rows = rxQueries.getBySession.all(latestSession.id);
+    if (!rows || rows.length === 0) {
+      return res.status(404).json({ error: "No Rx stored yet" });
+    }
+
+    const rx: Record<string, any> = {};
+    for (const row of rows) {
+      const r = row as any;
+      rx[r.eye] = {
+        S: r.S,
+        C: r.C,
+        Axis: r.Axis,
+        VA_logMAR: r.VA_logMAR,
+        confidence: r.confidence,
+        eye: r.eye,
+      };
+    }
+
+    res.json({
+      sessionId: latestSession.id,
+      createdAt: latestSession.createdAt,
+      rx,
+    });
+  } catch (error: any) {
+    console.error("Latest summary retrieval error:", error);
     res.status(500).json({ error: error.message });
   }
 });

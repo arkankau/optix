@@ -173,3 +173,67 @@
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
+.exam-section {
+  margin-top: 24px;
+  padding: 16px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.exam-section h4 {
+  margin: 0 0 12px 0;
+  color: #ffffff;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.exam-buttons {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.exam-button {
+  flex: 1;
+  background: linear-gradient(135deg, #00b4db 0%, #0083b0 100%);
+  color: white;
+  border: none;
+  padding: 10px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.exam-button.secondary {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.exam-button:hover {
+  opacity: 0.85;
+}
+
+.exam-selection {
+  margin-bottom: 12px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 13px;
+}
+
+.exam-selection select {
+  margin-left: 8px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: none;
+  background: rgba(0, 0, 0, 0.4);
+  color: white;
+}
+
+.exam-status {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+}
+

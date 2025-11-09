@@ -12,11 +12,18 @@ function ControlBar({
   setDistance,
   overlayVisible,
   onToggleOverlay,
-  onClose
+  onClose,
+  onLaunchEyeTest,
+  onRefreshPrescription,
+  prescription,
+  selectedEye,
+  onSelectEye,
+  examStatus,
 }) {
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const [position, setPosition] = useState({ x: window.innerWidth / 2 - 200, y: window.innerHeight / 2 - 150 });
+  const initialY = Math.max(40, window.innerHeight / 2 - 220);
+  const [position, setPosition] = useState({ x: window.innerWidth / 2 - 200, y: initialY });
 
   const handleMouseDown = (e) => {
     if (e.target.classList.contains('control-bar-header')) {
@@ -165,6 +172,41 @@ function ControlBar({
             {overlayVisible ? 'Hide Overlay' : 'Show Overlay'}
           </button>
         </div>
+
+        {onLaunchEyeTest && (
+          <div className="exam-section">
+            <h4>Eye Exam Pipeline</h4>
+            <div className="exam-buttons">
+              <button className="exam-button" onClick={onLaunchEyeTest}>
+                Run Eye Test
+              </button>
+              <button className="exam-button secondary" onClick={onRefreshPrescription}>
+                Load Latest Result
+              </button>
+            </div>
+            {prescription && (
+              <div className="exam-selection">
+                <label>
+                  Use eye:
+                  <select
+                    value={selectedEye}
+                    onChange={(e) => onSelectEye && onSelectEye(e.target.value)}
+                  >
+                    {Object.keys(prescription).map((eyeKey) => (
+                      <option key={eyeKey} value={eyeKey}>
+                        {eyeKey}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            )}
+            <div className="exam-status">
+              <span>Status:</span>
+              <span>{examStatus}</span>
+            </div>
+          </div>
+        )}
 
         <div className="shortcuts-info">
           <p><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>C</kbd> - Toggle Control Bar</p>

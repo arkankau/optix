@@ -9,7 +9,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "electron": "electron .",
-    "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
+    "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5123 && electron .\"",
+    "eye-test": "pnpm --dir eye-test-app dev",
+    "pipeline": "concurrently \"npm run eye-test\" \"npm run electron:dev\"",
     "electron:build": "npm run build && electron-builder"
   },
   "keywords": [
