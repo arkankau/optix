@@ -50,9 +50,34 @@ import elevenlabsRouter from "./routes/elevenlabs";
 const app = express();
 const PORT = process.env.PORT || 8787;
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
+const EXTRA_FRONTEND_ORIGINS =
+  process.env.FRONTEND_ORIGINS ??
+  [
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://localhost:5175",
+    "http://localhost:5176",
+  ].join(",");
+const FRONTEND_WHITELIST = new Set(
+  EXTRA_FRONTEND_ORIGINS.split(",").map((origin) => origin.trim())
+);
+
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, callback) => {
+    if (!origin) {
+      return callback(null, true);
+    }
+    if (FRONTEND_WHITELIST.has(origin)) {
+      return callback(null, true);
+    }
+    console.warn(`⚠️  CORS: blocked origin ${origin}`);
+    return callback(new Error("Not allowed by CORS"));
+  },
+  credentials: true,
+};
 
 // Middleware
-app.use(cors({ origin: FRONTEND_ORIGIN }));
+app.use(cors(corsOptions));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
@@ -93,7 +118,9 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 app.listen(PORT, () => {
   console.log("\n🚀 OptiX Exam API Server");
   console.log(`📡 Listening on http://localhost:${PORT}`);
-  console.log(`🌐 CORS enabled for ${FRONTEND_ORIGIN}`);
+  console.log(
+    `🌐 CORS enabled for: ${Array.from(FRONTEND_WHITELIST).join(", ")}`
+  );
   console.log("\n🎤 Voice Integrations:");
   console.log(`   - ElevenLabs TTS: ${process.env.ELEVENLABS_API_KEY ? "✅ Configured" : "⚠️  Not configured"}`);
   console.log(`   - Gemini STT/NLU: ${process.env.GEMINI_API_KEY ? "✅ Configured" : "⚠️  Not configured"}`);
