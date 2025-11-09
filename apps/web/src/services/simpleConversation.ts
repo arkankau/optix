@@ -98,10 +98,12 @@ export class SimpleConversation {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to get TTS audio');
+        const errorText = await response.text();
+        throw new Error(`Failed to get TTS audio: ${errorText}`);
       }
 
       const audioBlob = await response.blob();
+      console.log('🎵 Got audio blob:', audioBlob.size, 'bytes, type:', audioBlob.type);
       const audioUrl = URL.createObjectURL(audioBlob);
       
       // Play audio

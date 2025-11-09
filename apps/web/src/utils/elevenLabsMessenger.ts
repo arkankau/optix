@@ -10,13 +10,13 @@
 export function sendSystemMessageToAgent(message: string) {
   console.log('📤 Sending to ElevenLabs agent:', message);
   
-  // The ElevenLabs widget listens for postMessage events
-  // We send instructions that the agent should follow
-  window.postMessage({
-    type: 'elevenlabs-system-instruction',
-    message,
-    timestamp: Date.now(),
-  }, '*');
+  // Use the globally exposed speak function
+  const speak = (window as any).elevenLabsSpeak;
+  if (speak) {
+    speak(message);
+  } else {
+    console.warn('⚠️ ElevenLabs speak function not available');
+  }
 }
 
 /**

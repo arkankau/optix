@@ -110,6 +110,13 @@ export default function GlobalAIAssistant({ agentId: providedAgentId }: GlobalAI
       conversation.speak('Hello! I\'m your eye test assistant. Let\'s begin the examination. Please cover your left eye and look at the chart.');
 
       console.log('✅ Simple conversation initialized');
+      
+      // Expose speak function globally for system messages
+      (window as any).elevenLabsSpeak = (text: string) => {
+        console.log('📢 System message to agent:', text);
+        conversation.speak(text);
+      };
+      
     } catch (error) {
       console.error('❌ Failed to initialize conversation:', error);
       setElevenLabsReady(false);
