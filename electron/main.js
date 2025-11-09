@@ -26,44 +26,67 @@ function createWindow() {
   // Make window full screen but not truly fullscreen (so it stays transparent)
   mainWindow.maximize();
 
-  // Enable click-through when overlay is inactive (can be toggled)
-  // Initially, we want clicks to go through the transparent parts
-  mainWindow.setIgnoreMouseEvents(false); // Set to true for full click-through
+  // Enable click-through for transparent areas, but allow clicking on visible elements
+  mainWindow.setIgnoreMouseEvents(true, { forward: true });
 
   // Load the app
   if (process.env.NODE_ENV === 'development' || !app.isPackaged) {
     mainWindow.loadURL('http://localhost:5173');
-    // mainWindow.webContents.openDevTools(); // Uncomment for debugging
+    mainWindow.webContents.openDevTools(); // Open dev tools to see console
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
 
-  // Register global shortcuts
-  registerShortcuts();
+  // Register global shortcuts after window is loaded
+  mainWindow.webContents.once('did-finish-load', () => {
+    registerShortcuts();
+    console.log('Global shortcuts registered');
+  });
 }
 
 function registerShortcuts() {
+  // Unregister all shortcuts first to avoid conflicts
+  globalShortcut.unregisterAll();
+
   // Ctrl+Shift+C: Toggle control bar
-  globalShortcut.register('CommandOrControl+Shift+C', () => {
-    mainWindow.webContents.send('toggle-control-bar');
+  const shortcut1 = globalShortcut.register('CommandOrControl+Shift+C', () => {
+    console.log('Ctrl+Shift+C pressed - toggling control bar');
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('toggle-control-bar');
+    }
   });
+  
+  if (shortcut1) {
+    console.log('Successfully registered Ctrl+Shift+C');
+  } else {
+    console.error('Failed to register Ctrl+Shift+C');
+  }
 
   // Ctrl+Shift+W: Close app
-  globalShortcut.register('CommandOrControl+Shift+W', () => {
+  const shortcut2 = globalShortcut.register('CommandOrControl+Shift+W', () => {
+    console.log('Ctrl+Shift+W pressed - closing app');
     app.quit();
   });
+  
+  if (shortcut2) {
+    console.log('Successfully registered Ctrl+Shift+W');
+  } else {
+    console.error('Failed to register Ctrl+Shift+W');
+  }
 }
 
 // IPC handlers
 ipcMain.on('set-click-through', (event, enabled) => {
   if (mainWindow) {
-    mainWindow.setIgnoreMouseEvents(enabled, { forward: true });
+    // Always keep click-through enabled, but allow interaction with control bar
+    mainWindow.setIgnoreMouseEvents(true, { forward: true });
+    console.log('Click-through maintained (always enabled)');
   }
 });
 
 ipcMain.on('update-parameters', (event, parameters) => {
   // This can be used to persist parameters or communicate with other processes
-  console.log('Parameters updated:', parameters);
+  console.log('📊 Parameters updated from main process:', parameters);
 });
 
 app.whenReady().then(() => {

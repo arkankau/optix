@@ -2,10 +2,11 @@
   width: 100vw;
   height: 100vh;
   position: relative;
-  pointer-events: none;
+  pointer-events: none; /* Transparent areas are click-through */
 }
 
+/* Only visible elements can be interacted with */
 .app-container > * {
-  pointer-events: auto;
+  pointer-events: auto; /* Control bar and overlay can capture events */
 }
 

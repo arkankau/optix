@@ -16,9 +16,16 @@ function App() {
   // Listen for keyboard shortcut from Electron main process
   useEffect(() => {
     if (window.electronAPI) {
+      console.log('Setting up keyboard shortcut listener');
       window.electronAPI.onToggleControlBar(() => {
-        setShowControlBar(prev => !prev);
+        console.log('🎮 Toggle control bar triggered from shortcut');
+        setShowControlBar(prev => {
+          console.log(`Control bar: ${prev ? 'hiding' : 'showing'}`);
+          return !prev;
+        });
       });
+    } else {
+      console.warn('electronAPI not available - running in browser mode?');
     }
 
     // Cleanup
@@ -32,21 +39,31 @@ function App() {
   // Update click-through based on control bar visibility
   useEffect(() => {
     if (window.electronAPI) {
-      // When control bar is visible, disable click-through
-      // When control bar is hidden, enable click-through
-      window.electronAPI.setClickThrough(!showControlBar);
+      // Always maintain click-through for transparent areas
+      window.electronAPI.setClickThrough(true);
+      console.log(`🖱️ Control bar ${showControlBar ? 'visible' : 'hidden'} - click-through maintained`);
     }
   }, [showControlBar]);
 
-  // Notify main process when parameters change
+  // Notify main process when parameters change and log to console
   useEffect(() => {
+    console.log('📐 Parameters changed:', {
+      sphere: sphere.toFixed(2),
+      cylinder: cylinder.toFixed(2),
+      axis: axis.toFixed(0) + '°'
+    });
+    
     if (window.electronAPI) {
       window.electronAPI.updateParameters({ sphere, cylinder, axis });
     }
   }, [sphere, cylinder, axis]);
 
   const handleToggleOverlay = () => {
-    setOverlayVisible(prev => !prev);
+    setOverlayVisible(prev => {
+      const newValue = !prev;
+      console.log(`👁️ Overlay visibility toggled: ${newValue ? 'VISIBLE' : 'HIDDEN'}`);
+      return newValue;
+    });
   };
 
   return (

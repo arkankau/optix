@@ -67,7 +67,11 @@ function ControlBar({
             max="20"
             step="0.25"
             value={sphere}
-            onChange={(e) => setSphere(parseFloat(e.target.value))}
+            onChange={(e) => {
+              const newValue = parseFloat(e.target.value);
+              console.log(`🔵 Sphere changed: ${newValue.toFixed(2)}`);
+              setSphere(newValue);
+            }}
             className="slider"
           />
           <div className="range-labels">
@@ -87,7 +91,11 @@ function ControlBar({
             max="10"
             step="0.25"
             value={cylinder}
-            onChange={(e) => setCylinder(parseFloat(e.target.value))}
+            onChange={(e) => {
+              const newValue = parseFloat(e.target.value);
+              console.log(`🟢 Cylinder changed: ${newValue.toFixed(2)}`);
+              setCylinder(newValue);
+            }}
             className="slider"
           />
           <div className="range-labels">
@@ -107,7 +115,11 @@ function ControlBar({
             max="180"
             step="1"
             value={axis}
-            onChange={(e) => setAxis(parseFloat(e.target.value))}
+            onChange={(e) => {
+              const newValue = parseFloat(e.target.value);
+              console.log(`🟡 Axis changed: ${newValue.toFixed(0)}°`);
+              setAxis(newValue);
+            }}
             className="slider"
           />
           <div className="range-labels">
@@ -119,7 +131,10 @@ function ControlBar({
         <div className="control-actions">
           <button
             className={`toggle-button ${overlayVisible ? 'active' : ''}`}
-            onClick={onToggleOverlay}
+            onClick={() => {
+              console.log(`🔄 Toggle button clicked - Current state: ${overlayVisible}`);
+              onToggleOverlay();
+            }}
           >
             {overlayVisible ? 'Hide Overlay' : 'Show Overlay'}
           </button>
