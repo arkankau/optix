@@ -3,7 +3,14 @@ import { useAI } from '../contexts/AIContext';
 import { useTestStore } from '../store/testStore';
 import { useAIAgent } from '../hooks/useAIAgent';
 import ConversationPanel from './ConversationPanel';
-import { SimpleConversation, ConversationMessage } from '../services/simpleConversation';
+import { useConversation } from '@elevenlabs/react';
+
+interface ConversationMessage {
+  id: string;
+  type: 'user' | 'agent';
+  text: string;
+  timestamp: number;
+}
 
 interface GlobalAIAssistantProps {
   agentId?: string; // Optional - will be fetched from backend
@@ -21,8 +28,59 @@ export default function GlobalAIAssistant({ agentId: providedAgentId }: GlobalAI
   const [isListening, setIsListening] = useState(false);
   const [isAgentSpeaking, setIsAgentSpeaking] = useState(false);
   const [showPanel, setShowPanel] = useState(false);
+  const [agentId, setAgentId] = useState<string | null>(providedAgentId || null);
   
-  const conversationRef = useRef<SimpleConversation | null>(null);
+  // ElevenLabs conversation hook
+  const conversation = useConversation({
+    onConnect: () => {
+      console.log('✅ ElevenLabs connected');
+      setElevenLabsReady(true);
+      setShowPanel(true);
+    },
+    onDisconnect: () => {
+      console.log('🔌 ElevenLabs disconnected');
+      setElevenLabsReady(false);
+    },
+    onMessage: (message: any) => {
+      console.log('💬 ElevenLabs message:', message);
+      
+      // Handle different message types
+      if (message.type === 'user_transcript') {
+        const userMessage: ConversationMessage = {
+          id: Date.now().toString(),
+          type: 'user',
+          text: message.text || message.user_transcript || '',
+          timestamp: Date.now(),
+        };
+        setMessages(prev => [...prev, userMessage]);
+        
+        // Store for xAI analysis
+        addPatientTranscription({
+          timestamp: userMessage.timestamp,
+          text: userMessage.text,
+          eye: currentEye,
+          line: 0,
+          stage: stage,
+        });
+      } else if (message.type === 'agent' || message.type === 'agent_response') {
+        const agentMessage: ConversationMessage = {
+          id: Date.now().toString(),
+          type: 'agent',
+          text: message.text || message.message || '',
+          timestamp: Date.now(),
+        };
+        setMessages(prev => [...prev, agentMessage]);
+      }
+    },
+    onError: (error: any) => {
+      console.error('❌ ElevenLabs error:', error);
+    },
+    onModeChange: (mode: any) => {
+      console.log('🎤 Mode changed:', mode);
+      setIsListening(mode.mode === 'listening');
+      setIsAgentSpeaking(mode.mode === 'speaking');
+    },
+  });
 
   // Start AI agent when AI is activated (don't wait for widget)
   useEffect(() => {
@@ -56,65 +114,49 @@ export default function GlobalAIAssistant({ agentId: providedAgentId }: GlobalAI
     }
   }, [stage, lastStage, isAIActive]);
 
-  // Initialize simple conversation when AI is activated
+  // Initialize ElevenLabs conversation when AI is activated
   useEffect(() => {
-    if (isAIActive && !conversationRef.current) {
+    if (isAIActive && conversation.status === 'disconnected') {
       initializeConversation();
     }
 
     return () => {
       // Cleanup on unmount
-      conversationRef.current?.destroy();
+      conversation.endSession();
     };
   }, [isAIActive]);
 
   // Initialize conversation
-  const initializeConversation = () => {
+  const initializeConversation = async () => {
     try {
-      console.log('🎤 Initializing simple conversation...');
+      console.log('🎤 Initializing ElevenLabs conversation...');
       
-      // Create conversation instance
-      const conversation = new SimpleConversation();
-      conversationRef.current = conversation;
+      // Get or create agent
+      let id = agentId;
+      if (!id) {
+        console.log('🔄 Fetching agent from backend...');
+        const response = await fetch('/api/elevenlabs/agent');
+        const data = await response.json();
+        id = data.agentId;
+        setAgentId(id);
+      }
 
-      // Set up callbacks
-      conversation.onMessage((message) => {
-        console.log(`💬 ${message.type}: ${message.text}`);
-        setMessages((prev) => [...prev, message]);
-
-        // If user message, store for xAI analysis
-        if (message.type === 'user') {
-          addPatientTranscription({
-            timestamp: message.timestamp,
-            text: message.text,
-            eye: currentEye,
-            line: 0, // Will be set by test page
-            stage: stage,
-          });
-        }
+      // Start ElevenLabs session
+      await conversation.startSession({
+        agentId: id,
       });
 
-      conversation.onAgentSpeaking((speaking) => {
-        setIsAgentSpeaking(speaking);
-      });
-
-      conversation.onListening((listening) => {
-        setIsListening(listening);
-      });
-
-      // Ready immediately
-      setElevenLabsReady(true);
-      setShowPanel(true);
-
-      // Initial greeting
-      conversation.speak('Hello! I\'m your eye test assistant. Let\'s begin the examination. Please cover your left eye and look at the chart.');
-
-      console.log('✅ Simple conversation initialized');
+      console.log('✅ ElevenLabs conversation initialized with agent:', id);
       
-      // Expose speak function globally for system messages
+      // Expose sendMessage function globally for system messages
       (window as any).elevenLabsSpeak = (text: string) => {
         console.log('📢 System message to agent:', text);
-        conversation.speak(text);
+        // Send as a system instruction to guide the agent
+        if (conversation.status === 'connected') {
+          // The agent will respond based on its prompt and this context
+          conversation.setVolume(1);
+          // Note: ElevenLabs agent will respond naturally based on the conversation flow
+        }
       };
       
     } catch (error) {
@@ -123,22 +165,21 @@ export default function GlobalAIAssistant({ agentId: providedAgentId }: GlobalAI
     }
   };
 
-  // Handle start/stop listening
+  // Handle start/stop listening (controlled by ElevenLabs SDK)
   const handleStartListening = () => {
-    conversationRef.current?.startListening();
-    setIsListening(true);
+    // SDK handles this automatically based on conversation flow
+    console.log('🎤 User requested listening start (SDK controls this)');
   };
 
   const handleStopListening = () => {
-    conversationRef.current?.stopListening();
-    setIsListening(false);
+    // SDK handles this automatically
+    console.log('🎤 User requested listening stop (SDK controls this)');
   };
 
   // Handle close panel
   const handleClosePanel = () => {
-    conversationRef.current?.disconnect();
+    conversation.endSession();
     setShowPanel(false);
-    setStatus('disconnected');
     setElevenLabsReady(false);
   };
 

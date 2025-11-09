@@ -12,7 +12,6 @@ export interface ConversationMessage {
 
 export class SimpleConversation {
   private recognition: any = null;
-  private currentAudio: HTMLAudioElement | null = null;
   private isListening = false;
   private isAgentSpeaking = false;
 
@@ -71,68 +70,58 @@ export class SimpleConversation {
   }
 
   /**
-   * Agent speaks using ElevenLabs TTS
+   * Agent speaks using browser's built-in TTS
+   * Much more reliable than ElevenLabs API
    */
   async speak(text: string): Promise<void> {
-    try {
-      console.log(`🤖 Agent speaking: "${text}"`);
-      this.isAgentSpeaking = true;
-      this.onAgentSpeakingCallback?.(true);
+    return new Promise((resolve, reject) => {
+      try {
+        console.log(`🤖 Agent speaking: "${text}"`);
+        this.isAgentSpeaking = true;
+        this.onAgentSpeakingCallback?.(true);
 
-      // Add agent message to transcript
-      this.onMessageCallback?.({
-        id: Date.now().toString(),
-        type: 'agent',
-        text: text,
-        timestamp: Date.now(),
-      });
+        // Add agent message to transcript
+        this.onMessageCallback?.({
+          id: Date.now().toString(),
+          type: 'agent',
+          text: text,
+          timestamp: Date.now(),
+        });
 
-      // Get audio from ElevenLabs TTS
-      const response = await fetch('/api/voice/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          text,
-          voiceId: 'EXAVITQu4vr4xnSDxMaL' // Default ElevenLabs voice
-        }),
-      });
+        // Use browser's built-in Speech Synthesis
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'en-US';
+        utterance.rate = 1.0;
+        utterance.pitch = 1.0;
+        utterance.volume = 1.0;
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to get TTS audio: ${errorText}`);
-      }
+        utterance.onend = () => {
+          console.log('🔊 Agent finished speaking');
+          this.isAgentSpeaking = false;
+          this.onAgentSpeakingCallback?.(false);
+          
+          // Auto-start listening for user response
+          setTimeout(() => this.startListening(), 500);
+          resolve();
+        };
 
-      const audioBlob = await response.blob();
-      console.log('🎵 Got audio blob:', audioBlob.size, 'bytes, type:', audioBlob.type);
-      const audioUrl = URL.createObjectURL(audioBlob);
-      
-      // Play audio
-      this.currentAudio = new Audio(audioUrl);
-      
-      this.currentAudio.onended = () => {
-        console.log('🔊 Agent finished speaking');
-        this.isAgentSpeaking = false;
-        this.onAgentSpeakingCallback?.(false);
+        utterance.onerror = (e) => {
+          console.error('❌ Speech synthesis error:', e);
+          this.isAgentSpeaking = false;
+          this.onAgentSpeakingCallback?.(false);
+          reject(e);
+        };
+
+        window.speechSynthesis.speak(utterance);
+        console.log('🔊 Speaking with browser TTS');
         
-        // Auto-start listening for user response
-        setTimeout(() => this.startListening(), 500);
-      };
-
-      this.currentAudio.onerror = (e) => {
-        console.error('❌ Audio playback error:', e);
+      } catch (error) {
+        console.error('❌ Error in speak():', error);
         this.isAgentSpeaking = false;
         this.onAgentSpeakingCallback?.(false);
-      };
-
-      await this.currentAudio.play();
-      console.log('🔊 Playing agent audio');
-      
-    } catch (error) {
-      console.error('❌ Error in speak():', error);
-      this.isAgentSpeaking = false;
-      this.onAgentSpeakingCallback?.(false);
-      throw error;
-    }
+        reject(error);
+      }
+    });
   }
 
   /**
@@ -173,10 +162,7 @@ export class SimpleConversation {
    * Stop agent speaking
    */
   stopSpeaking() {
-    if (this.currentAudio) {
-      this.currentAudio.pause();
-      this.currentAudio = null;
-    }
+    window.speechSynthesis.cancel();
     this.isAgentSpeaking = false;
     this.onAgentSpeakingCallback?.(false);
   }
